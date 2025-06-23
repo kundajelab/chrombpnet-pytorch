@@ -1,6 +1,5 @@
 # Author: Lei Xiong <jsxlei@gmail.com>
-f
-rom .parse_utils import add_argparse_args, from_argparse_args, parse_argparser, get_init_arguments_and_types
+from .parse_utils import add_argparse_args, from_argparse_args, parse_argparser, get_init_arguments_and_types
 from argparse import ArgumentParser, Namespace
 from typing import Any, List, Tuple, Union
 
