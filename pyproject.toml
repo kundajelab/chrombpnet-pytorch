@@ -7,7 +7,7 @@ packages = ["chrombpnet"]
 
 [project]
 name = "chrombpnet_pytorch"
-version = "0.0.1.dev"
+version = "0.0.2"
 description = "ChromBPNet pytorch"
 readme = "README.md"
 requires-python = ">=3.7"
