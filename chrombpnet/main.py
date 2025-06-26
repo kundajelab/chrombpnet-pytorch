@@ -2,10 +2,9 @@
 
 # Author: Lei Xiong <jsxlei@gmail.com>
 """
-RegNet Training Script
+ChromBPNet Training Script
 
-This script provides functionality for training, predicting, and interpreting RegNet models.
-It supports multiple model types including RegNet, ChromBPNet, BPNet, and Borzoi.
+This script provides functionality for training, predicting, and interpreting ChromBPNet models.
 
 Key features:
 - Training models with configurable hyperparameters
@@ -15,9 +14,9 @@ Key features:
 - Support for distributed training
 
 Usage:
-    python train.py train [options]  # For training
-    python train.py predict [options]  # For prediction
-    python train.py interpret [options]  # For interpretation
+    chrombpnet train [options]  # For training
+    chrombpnet predict [options]  # For prediction
+    chrombpnet interpret [options]  # For interpretation
 """
 
 import os
@@ -40,7 +39,7 @@ from chrombpnet.chrombpnet import BPNet, ChromBPNet
 from chrombpnet.model_config import ChromBPNetConfig
 from chrombpnet.model_wrappers import create_model_wrapper, load_pretrained_model, adjust_bias_model_logcounts
 from chrombpnet.dataset import DataModule
-from chrombpnet.data_config import DataConfig, DATA_DIR
+from chrombpnet.data_config import DataConfig
 from chrombpnet.metrics import compare_with_observed, save_predictions
 from chrombpnet.interpret import run_modisco_and_shap 
 from chrombpnet.logger import create_logger
@@ -189,6 +188,7 @@ def load_model(args):
 
 
 def predict(args, model, datamodule=None):
+    args.out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
     if datamodule is None:
         data_config = DataConfig.from_argparse_args(args)
         datamodule = DataModule(data_config)
@@ -207,10 +207,13 @@ def predict(args, model, datamodule=None):
         dataloader, dataset = datamodule.chrom_dataloader(chrom)
         regions = dataset.regions
         log.info(f"{chrom}: {regions['is_peak'].value_counts()}")
-        model_metrics = compare_with_observed(trainer.predict(model, dataloader), regions, os.path.join(args.out_dir, 'evaluation', chrom))    
+        output = trainer.predict(model, dataloader)
+        model_metrics = compare_with_observed(output, regions, os.path.join(args.out_dir, 'evaluation', chrom))    
+        save_predictions(output, regions, hg38_datasets().fetch('hg38.chrom.sizes'), os.path.join(args.out_dir, 'evaluation', chrom))
 
 
 def interpret(args, model, datamodule=None):
+    args.out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
     if datamodule is None:
         data_config = DataConfig.from_argparse_args(args)
         datamodule = DataModule(data_config)

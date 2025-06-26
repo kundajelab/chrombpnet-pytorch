@@ -12,6 +12,7 @@ from matplotlib import pyplot as plt
 from scipy.interpolate import interpn
 from .metrics_utils import * 
 from .data_utils import write_bigwig, read_chrom_sizes
+from .genome import hg38_datasets   
 
 plt.rcParams["figure.figsize"]=10,5
 font = {'weight' : 'bold',
@@ -85,7 +86,7 @@ def write_predictions_h5py(profile, logcts, coords, out_dir='.'):
     h5_file.close()
 
 
-def save_predictions(output, regions, chrom_sizes=os.path.expanduser('~/.cache/regnet/hg38.chrom.sizes'), out_dir='./'):
+def save_predictions(output, regions, chrom_sizes=hg38_datasets().fetch('hg38.chrom.sizes'), out_dir='./'):
     """
     Save the predictions to an HDF5 file and write regions to a CSV file.
     """

@@ -13,12 +13,7 @@ from argparse import ArgumentParser, Namespace
 import os
 import json
 from .parse_utils import add_argparse_args, from_argparse_args, parse_argparser, get_init_arguments_and_types
-
-HG38_GENOME_DIR = '/oak/stanford/groups/akundaje/leixiong/genome/hg38'
-DATA_DIR = '/oak/stanford/groups/akundaje/leixiong/data/atac/K562'
-MEME_FILE = '/oak/stanford/groups/akundaje/leixiong/genomemotifs/motifs.meme.txt'
-HG38_FASTA = os.path.join(HG38_GENOME_DIR, 'hg38.fa')
-HG38_CHROM_SIZES = os.path.join(HG38_GENOME_DIR, 'hg38.chrom.sizes')
+from .genome import hg38, hg38_datasets
 
 @dataclass
 class DataConfig:
@@ -30,8 +25,7 @@ class DataConfig:
     
     def __init__(
             self,
-            data_dir: str = DATA_DIR,
-            # data_name: str = 'K562',
+            data_dir: str = None,
             peaks: str = '{}/peaks.bed',
             negatives: str = '{}/negatives.bed', 
             bigwig: str = '{}/unstranded.bw', 
@@ -42,9 +36,8 @@ class DataConfig:
             ctl_minus: str = None, 
             negative_sampling_ratio: float = 0.1,
             saved_data: str = None,
-            fasta: str = HG38_FASTA,
-            chrom_sizes: dict = HG38_CHROM_SIZES,
-            fold_dir: str = os.path.join(HG38_GENOME_DIR, 'splits'),
+            fasta: str = hg38.fasta,
+            chrom_sizes: dict = hg38.chrom_sizes,
             in_window: int = 2114,
             out_window: int = 1000,
             shift: int = 500,
@@ -92,7 +85,9 @@ class DataConfig:
             self.batch_size = batch_size    
             self.num_workers = num_workers
             self.debug = debug
-            splits_dict = json.load(open(os.path.join(fold_dir, f'fold_{fold}.json')))
+            # splits_dict = json.load(open(os.path.join(fold_dir, f'fold_{fold}.json')))
+            fold_file_path = hg38_datasets().fetch(f'fold_{fold}.json', progressbar=False)
+            splits_dict = json.load(open(fold_file_path))
             self.training_chroms = splits_dict['train'] if training_chroms is None else training_chroms
             self.validation_chroms = splits_dict['valid'] if validation_chroms is None else validation_chroms
             self.test_chroms = splits_dict['test'] if test_chroms is None else test_chroms

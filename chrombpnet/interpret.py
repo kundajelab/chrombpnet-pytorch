@@ -5,7 +5,6 @@ from tangermeme.utils import _validate_input
 
 from .model_wrappers import ProfileWrapper, CountWrapper, _ProfileLogitScaling, _Log, _Exp
 from .data_utils import get_seq, load_region_df, hdf5_to_bigwig, html_to_pdf
-from .data_config import MEME_FILE, HG38_FASTA, HG38_CHROM_SIZES
 
 import pandas as pd
 import numpy as np
@@ -14,7 +13,9 @@ import torch
 import deepdish
 import pyfaidx
 
-meme_file = MEME_FILE
+from .genome import motifs_datasets, hg38
+MEME_FILE = motifs_datasets().fetch("motifs.meme.txt")
+
 from tangermeme.ersatz import dinucleotide_shuffle
 from tangermeme.deep_lift_shap import deep_lift_shap as t_deep_lift_shap
 from tangermeme.deep_lift_shap import _nonlinear
@@ -257,14 +258,14 @@ def run_modisco_and_shap(
         model, 
         peaks, 
         out_dir, 
-        fasta=HG38_FASTA, 
+        fasta=hg38.fasta, 
         in_window=2114, 
         out_window=1000,
         task='counts', 
         batch_size=64, 
-        chrom_sizes=HG38_CHROM_SIZES,
+        chrom_sizes=hg38.chrom_sizes,
         sub_sample=None, 
-        meme_file=meme_file, 
+        meme_file=MEME_FILE, 
         max_seqlets=1000_000, 
         width=500, 
         device='cuda',
@@ -403,6 +404,7 @@ def generate_shap_dict(seqs, scores):
 if __name__ == '__main__':
     import argparse
     import torch
+    from .genome import hg38
 
     parser = argparse.ArgumentParser(description='Run modisco')
     parser.add_argument('--model', type=str, required=True)
