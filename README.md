@@ -1,4 +1,4 @@
-# [Pytorch Implementation] Bias factorized, base-resolution deep learning models of chromatin accessibility reveal cis-regulatory sequence syntax, transcription factor footprints and regulatory variants
+# ChromBPNet Pytorch
 
 - Pytorch implementation for [ChromBPNet](https://github.com/kundajelab/chrombpnet)
 - Please refer to original [code](https://github.com/kundajelab/chrombpnet) and paper [ChromBPNet: Bias factorized, base-resolution deep learning models of chromatin accessibility reveal cis-regulatory sequence syntax, transcription factor footprints and regulatory variants](https://www.biorxiv.org/content/10.1101/2024.12.25.630221v1) by  Anusri Pampari*, Anna Shcherbina*, Anshul Kundaje. (*authors contributed equally)  

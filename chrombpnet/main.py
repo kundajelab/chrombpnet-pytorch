@@ -55,6 +55,8 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
                        help='Run a quick development test')
     parser.add_argument('--version', '-v', type=str, default=None,
                        help='Version identifier for the run')
+    parser.add_argument('--name', type=str, default='',
+                       help='Name of the run')
     parser.add_argument('--checkpoint', '-c', type=str, default=None,
                        help='Path to model checkpoint')
     parser.add_argument('--gpu', type=int, nargs='+', default=[0],
@@ -121,6 +123,9 @@ def get_parser() -> argparse.ArgumentParser:
 
 def train(args):
     data_config = DataConfig.from_argparse_args(args)
+    loggers=[L.pytorch.loggers.CSVLogger(args.out_dir, name=args.name, version=f'fold_{args.fold}')]
+    args.out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
+    os.makedirs(args.out_dir, exist_ok=True)
 
     if os.path.exists(os.path.join(args.out_dir, 'checkpoints/best_model.ckpt')):
         raise ValueError(f"Model folder {args.out_dir}/checkpoints/best_model.ckpt already exists. Please delete the existing model or specify a new version.")
@@ -142,11 +147,12 @@ def train(args):
     args.alpha = datamodule.median_count / 10
     log.info(f'alpha: {args.alpha}')
 
+    if args.bias_scaled is None:
+        args.bias_scaled = os.path.join(args.data_dir, 'bias_scaled.h5')
     model = create_model_wrapper(args)
     if args.adjust_bias:
         adjust_bias_model_logcounts(model.model.bias, datamodule.negative_dataloader())
 
-    loggers=[L.pytorch.loggers.CSVLogger(args.out_dir, name=args.model_type, version=f'fold_{args.fold}')]
 
     trainer = L.Trainer(
         max_epochs=args.max_epochs,
@@ -155,7 +161,7 @@ def train(args):
         accelerator='gpu',
         devices=args.gpu,
         val_check_interval=None,
-        strategy=DDPStrategy(find_unused_parameters=True),
+        # strategy=DDPStrategy(find_unused_parameters=True),
         callbacks=[
             L.pytorch.callbacks.EarlyStopping(monitor='val_loss', patience=5),
             L.pytorch.callbacks.ModelCheckpoint(monitor='val_loss', save_top_k=1, mode='min', filename='best_model', save_last=True),
@@ -224,10 +230,6 @@ def interpret(args, model, datamodule=None):
 def main():
     parser = get_parser()
     args = parser.parse_args()
-
-    args.out_dir = os.path.join(args.out_dir, f'fold_{args.fold}')
-    os.makedirs(args.out_dir, exist_ok=True)
-    args.bias_scaled = os.path.join(DATA_DIR, 'bias_scaled.h5')
 
     datamodule = None
     if args.command == 'train':
