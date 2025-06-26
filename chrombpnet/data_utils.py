@@ -199,6 +199,8 @@ def load_region_df(peak_bed, chrom_sizes=None, in_window=2114, shift=0, width=50
 
     if isinstance(chrom_sizes, str):
         chrom_sizes = read_chrom_sizes(chrom_sizes)
+    else:
+        print(chrom_sizes)
 
     if df.shape[1] < 10:
         df = expand_3col_to_10col(df)
@@ -410,13 +412,13 @@ def hdf5_to_bigwig(hdf5, regions, chrom_sizes, output_prefix, output_prefix_stat
 
     # gs = bigwig_helper.read_chrom_sizes(chrom_sizes)
     # gs = chrom_sizes
-    regions = bigwig_helper.get_regions(regions, SEQLEN)
+    regions = get_regions(regions, SEQLEN)
     chr_list = set([region[0] for region in regions])
     chrom_sizes = [(x, v) for x, v in chrom_sizes.items() if x in chr_list]
     
     assert(d.shape[0] == len(regions))
 
-    bigwig_helper.write_bigwig(d.sum(1), 
+    write_bigwig(d.sum(1), 
                         regions, 
                         chrom_sizes, 
                         output_prefix+".bw", 

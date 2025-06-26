@@ -96,7 +96,7 @@ class DataModule(L.LightningDataModule):
                 shift=self.config.shift,
                 is_peak=False,
             )
-            print(self.background.head())
+            # print(self.background.head())
 
         if self.config.debug:
             self._debug_subsample()
@@ -400,6 +400,7 @@ class ChromBPNetDataset(torch.utils.data.Dataset):
         self.return_coords = return_coords
         self.shuffle_at_epoch_start = shuffle_at_epoch_start
 
+        self.regions = pd.concat([peak_regions, nonpeak_regions], ignore_index=True)
         # Initialize data
         self.crop_revcomp_data()
 
@@ -458,7 +459,7 @@ class ChromBPNetDataset(torch.utils.data.Dataset):
             self.seqs, self.cts, self.coords, self.inputlen, self.outputlen,
             self.add_revcomp, shuffle=self.shuffle_at_epoch_start
         )
-        self.regions = pd.DataFrame(self.cur_coords, columns=['chrom', 'start', 'forward_or_reverse', 'is_peak'])
+        # self.regions = pd.DataFrame(self.cur_coords, columns=['chrom', 'start', 'forward_or_reverse', 'is_peak'])
         # print('Regions', self.regions['is_peak'].value_counts())
 
     def __getitem__(self, idx):

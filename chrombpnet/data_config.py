@@ -13,7 +13,7 @@ from argparse import ArgumentParser, Namespace
 import os
 import json
 from .parse_utils import add_argparse_args, from_argparse_args, parse_argparser, get_init_arguments_and_types
-from .genome import hg38, hg38_datasets
+from .genome import hg38, hg38_datasets, mm10, mm10_datasets
 
 @dataclass
 class DataConfig:
@@ -36,8 +36,8 @@ class DataConfig:
             ctl_minus: str = None, 
             negative_sampling_ratio: float = 0.1,
             saved_data: str = None,
-            fasta: str = hg38.fasta,
-            chrom_sizes: dict = hg38.chrom_sizes,
+            fasta: str = None,
+            chrom_sizes: str = None,
             in_window: int = 2114,
             out_window: int = 1000,
             shift: int = 500,
@@ -51,13 +51,15 @@ class DataConfig:
             test_chroms: List = ["chr1", "chr3", "chr6"],
             exclude_chroms: list = [],
             fold: int = 0,
+            genome: str = 'hg38',
             batch_size: int = 64,
             num_workers: int = 32,
             debug: bool = False,
             **kwargs,
         ):
 
-            # data_dir = os.path.join(data_dir, data_name)
+            _genome = hg38 if genome == 'hg38' else mm10 if genome == 'mm10' else None
+            _datasets = hg38_datasets() if genome == 'hg38' else mm10_datasets() if genome == 'mm10' else None
             self.data_dir = data_dir
             self.peaks = peaks.format(data_dir) #if peaks is not None else f'{data_dir}/peaks.bed'
             self.negatives = negatives.format(data_dir) #if negatives is not None else f'{data_dir}/negatives.bed'
@@ -69,8 +71,8 @@ class DataConfig:
             self.ctl_minus = ctl_minus #if ctl_minus is not None else f'{data_dir}/control.minus.bw'
             self.negative_sampling_ratio = negative_sampling_ratio
             self.saved_data = saved_data
-            self.fasta = fasta
-            self.chrom_sizes = chrom_sizes
+            self.fasta = fasta if fasta is not None else _genome.fasta
+            self.chrom_sizes = chrom_sizes if chrom_sizes is not None else _genome.chrom_sizes
             self.in_window = in_window
             self.out_window = out_window
             self.shift = shift
@@ -85,8 +87,9 @@ class DataConfig:
             self.batch_size = batch_size    
             self.num_workers = num_workers
             self.debug = debug
-            # splits_dict = json.load(open(os.path.join(fold_dir, f'fold_{fold}.json')))
-            fold_file_path = hg38_datasets().fetch(f'fold_{fold}.json', progressbar=False)
+
+
+            fold_file_path = _datasets.fetch(f'fold_{fold}.json', progressbar=False)
             splits_dict = json.load(open(fold_file_path))
             self.training_chroms = splits_dict['train'] if training_chroms is None else training_chroms
             self.validation_chroms = splits_dict['valid'] if validation_chroms is None else validation_chroms

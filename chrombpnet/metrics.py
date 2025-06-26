@@ -86,13 +86,15 @@ def write_predictions_h5py(profile, logcts, coords, out_dir='.'):
     h5_file.close()
 
 
-def save_predictions(output, regions, chrom_sizes=hg38_datasets().fetch('hg38.chrom.sizes'), out_dir='./'):
+def save_predictions(output, regions, chrom_sizes, out_dir='./'):
     """
     Save the predictions to an HDF5 file and write regions to a CSV file.
     """
     os.makedirs(out_dir, exist_ok=True)
-    # chrom_sizes = os.path.expanduser('~/.cache/regnet/hg38.chrom.sizes')
-    gs = read_chrom_sizes(chrom_sizes)
+    with open(chrom_sizes) as f:
+        gs = [x.strip().split('\t') for x in f]
+    gs = [(x[0], int(x[1])) for x in gs if len(x)==2]
+    # gs = read_chrom_sizes(chrom_sizes); print(gs)
 
     seqlen = 1000
     regions_array = [[x[0], int(x[1])+int(x[9])-seqlen//2, int(x[1])+int(x[9])+seqlen//2, int(x[1])+int(x[9])] for x in np.array(regions.values)]
@@ -183,7 +185,7 @@ def compare_with_observed(output, regions, out_dir='./'):
     metrics_dictionary["profile_metrics"]["peaks"]["median_jsd"] = np.nanmedian(jsd_pw)        
     metrics_dictionary["profile_metrics"]["peaks"]["median_norm_jsd"] = np.nanmedian(jsd_norm)
 
-    print(metrics_dictionary)
+    print(json.dumps(metrics_dictionary, indent=4, default=lambda o: float(o)))
 
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, 'metrics.json'), 'w') as fp:

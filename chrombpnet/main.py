@@ -40,7 +40,7 @@ from chrombpnet.model_config import ChromBPNetConfig
 from chrombpnet.model_wrappers import create_model_wrapper, load_pretrained_model, adjust_bias_model_logcounts
 from chrombpnet.dataset import DataModule
 from chrombpnet.data_config import DataConfig
-from chrombpnet.genome import hg38_datasets
+from chrombpnet.genome import hg38_datasets, mm10_datasets
 from chrombpnet.metrics import compare_with_observed, save_predictions
 from chrombpnet.interpret import run_modisco_and_shap 
 from chrombpnet.logger import create_logger
@@ -210,7 +210,7 @@ def predict(args, model, datamodule=None):
         log.info(f"{chrom}: {regions['is_peak'].value_counts()}")
         output = trainer.predict(model, dataloader)
         model_metrics = compare_with_observed(output, regions, os.path.join(args.out_dir, 'evaluation', chrom))    
-        save_predictions(output, regions, hg38_datasets().fetch('hg38.chrom.sizes'), os.path.join(args.out_dir, 'evaluation', chrom))
+        save_predictions(output, regions, data_config.chrom_sizes, os.path.join(args.out_dir, 'evaluation', chrom))
 
 
 def interpret(args, model, datamodule=None):

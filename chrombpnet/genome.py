@@ -181,11 +181,21 @@ def mm10_datasets():
                 "mm10.gtf.gz": "md5:5a103c9a15dd660c295a089ef5035672",
                 "mm10.fa": "md5:7e329b2bf419a9f5a7dc42c625c884ac",
                 "mm10.chrom.sizes": "md5:5a103c9a15dd660c295a089ef5035672",
+                "fold_0.json": "md5:32f25d53ba1270fe2acd15b31bc4789d",
+                "fold_1.json": "md5:b07be1148b1e81399436c985c0647999",
+                "fold_2.json": "md5:fccbd2d245aca6433ad6f729a2e5d9a8",
+                "fold_3.json": "md5:c74f9221fc7f0d5984368c4cf594a071",
+                "fold_4.json": "md5:f3eaf62e8a013db9de19f606a46dba04",
             },
             urls={
                 "mm10.gtf.gz": "https://zenodo.org/records/12193429/files/mm10.gtf.gz",
                 "mm10.fa": "https://zenodo.org/records/12193429/files/mm10.fa",
                 "mm10.chrom.sizes": "https://zenodo.org/records/12193429/files/mm10.chrom.sizes",
+                "fold_0.json": "https://zenodo.org/records/12193429/files/fold_0.json",
+                "fold_1.json": "https://zenodo.org/records/12193429/files/fold_1.json",
+                "fold_2.json": "https://zenodo.org/records/12193429/files/fold_2.json",
+                "fold_3.json": "https://zenodo.org/records/12193429/files/fold_3.json",
+                "fold_4.json": "https://zenodo.org/records/12193429/files/fold_4.json",
             },
         )
     return EnhancedDataset(_create_dataset)
@@ -215,7 +225,8 @@ class Genome:
         *,
         fasta: Path | Callable[[], Path], 
         annotation: Path | Callable[[], Path],
-        chrom_sizes: dict[str, int] | None = None,
+        chrom_sizes: Path | Callable[[], Path],
+        # chrom_sizes: dict[str, int] | None = None,
     ):
         """
         Initializes the Genome object with paths or callables for FASTA and annotation files,
@@ -250,6 +261,7 @@ class Genome:
             raise ValueError("annotation must be a Path or Callable")
 
         self._chrom_sizes = chrom_sizes
+        self.chrom_sizes = chrom_sizes
 
     @property
     def fasta(self):
@@ -279,21 +291,21 @@ class Genome:
             self._annotation = Path(self._fetch_annotation())
         return str(self._annotation)
 
-    @property
-    def chrom_sizes(self):
-        """
-        A dictionary with chromosome names as keys and their lengths as values.
+    # @property
+    # def chrom_sizes(self):
+    #     """
+    #     A dictionary with chromosome names as keys and their lengths as values.
 
-        Returns
-        -------
-        dict[str, int]
-            A dictionary of chromosome sizes.
-        """
-        if self._chrom_sizes is None:
-            from pyfaidx import Fasta
-            fasta = Fasta(self.fasta)
-            self._chrom_sizes = {chr: len(fasta[chr]) for chr in fasta.keys()}
-        return self._chrom_sizes
+    #     Returns
+    #     -------
+    #     dict[str, int]
+    #         A dictionary of chromosome sizes.
+    #     """
+    #     if self._chrom_sizes is None:
+    #         from pyfaidx import Fasta
+    #         fasta = Fasta(self.fasta)
+    #         self._chrom_sizes = {chr: len(fasta[chr]) for chr in fasta.keys()}
+    #     return self._chrom_sizes
         
 
 GRCh38 = Genome(
@@ -306,14 +318,18 @@ GRCh38 = Genome(
         "hg38.gtf.gz", 
         progressbar=True
     ),
-    chrom_sizes= {"chr1": 248956422, "chr2": 242193529, "chr3": 198295559,
-                  "chr4": 190214555, "chr5": 181538259, "chr6": 170805979,
-                  "chr7": 159345973, "chr8": 145138636, "chr9": 138394717,
-                  "chr10": 133797422, "chr11": 135086622, "chr12": 133275309,
-                  "chr13": 114364328, "chr14": 107043718, "chr15": 101991189,
-                  "chr16": 90338345, "chr17": 83257441, "chr18": 80373285,
-                  "chr19": 58617616, "chr20": 64444167, "chr21": 46709983,
-                  "chr22": 50818468, "chrX": 156040895, "chrY": 57227415},
+    chrom_sizes= hg38_datasets().fetch(
+        "hg38.chrom.sizes", 
+        progressbar=True
+    ),
+    # {"chr1": 248956422, "chr2": 242193529, "chr3": 198295559,
+    #               "chr4": 190214555, "chr5": 181538259, "chr6": 170805979,
+    #               "chr7": 159345973, "chr8": 145138636, "chr9": 138394717,
+    #               "chr10": 133797422, "chr11": 135086622, "chr12": 133275309,
+    #               "chr13": 114364328, "chr14": 107043718, "chr15": 101991189,
+    #               "chr16": 90338345, "chr17": 83257441, "chr18": 80373285,
+    #               "chr19": 58617616, "chr20": 64444167, "chr21": 46709983,
+    #               "chr22": 50818468, "chrX": 156040895, "chrY": 57227415},
     )
 hg38 = GRCh38
 
@@ -327,29 +343,33 @@ GRCm38 = Genome(
         "mm10.gtf.gz", 
         progressbar=True
     ),
-    chrom_sizes={
-        "chr1": 195471971,
-        "chr2": 182113224,
-        "chr3": 160039680,
-        "chr4": 156508116,
-        "chr5": 151834684,
-        "chr6": 149736546,
-        "chr7": 145441459,
-        "chr8": 129401213,
-        "chr9": 124595110,
-        "chr10": 130694993,
-        "chr11": 122082543,
-        "chr12": 120129022,
-        "chr13": 120421639,
-        "chr14": 124902244,
-        "chr15": 104043685,
-        "chr16": 98207768,
-        "chr17": 94987271,
-        "chr18": 90702639,
-        "chr19": 61431566,
-        "chrX": 171031299,
-        "chrY": 91744698,
-    },
+    chrom_sizes= mm10_datasets().fetch(
+        "mm10.chrom.sizes", 
+        progressbar=True
+    ),
+    # chrom_sizes={
+    #     "chr1": 195471971,
+    #     "chr2": 182113224,
+    #     "chr3": 160039680,
+    #     "chr4": 156508116,
+    #     "chr5": 151834684,
+    #     "chr6": 149736546,
+    #     "chr7": 145441459,
+    #     "chr8": 129401213,
+    #     "chr9": 124595110,
+    #     "chr10": 130694993,
+    #     "chr11": 122082543,
+    #     "chr12": 120129022,
+    #     "chr13": 120421639,
+    #     "chr14": 124902244,
+    #     "chr15": 104043685,
+    #     "chr16": 98207768,
+    #     "chr17": 94987271,
+    #     "chr18": 90702639,
+    #     "chr19": 61431566,
+    #     "chrX": 171031299,
+    #     "chrY": 91744698,
+    # },
     )
 mm10 = GRCm38
 
