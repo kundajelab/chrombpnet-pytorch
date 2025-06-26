@@ -40,6 +40,7 @@ from chrombpnet.model_config import ChromBPNetConfig
 from chrombpnet.model_wrappers import create_model_wrapper, load_pretrained_model, adjust_bias_model_logcounts
 from chrombpnet.dataset import DataModule
 from chrombpnet.data_config import DataConfig
+from chrombpnet.genome import hg38_datasets
 from chrombpnet.metrics import compare_with_observed, save_predictions
 from chrombpnet.interpret import run_modisco_and_shap 
 from chrombpnet.logger import create_logger
