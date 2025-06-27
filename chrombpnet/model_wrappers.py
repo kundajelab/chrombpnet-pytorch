@@ -573,10 +573,6 @@ class ChromBPNetWrapper(BPNetWrapper):
 
         config = ChromBPNetConfig.from_argparse_args(args)
         self.model = ChromBPNet(config)
-        if args.bias_scaled:
-            self.model.bias = self.init_bias(args.bias_scaled)
-        if args.chrombpnet_wo_bias:
-            self.model.model = self.init_chrombpnet_wo_bias(args.chrombpnet_wo_bias)
 
 
 def create_model_wrapper(
@@ -600,7 +596,12 @@ def create_model_wrapper(
     if model_type == 'bpnet':
         return BPNetWrapper(args)
     elif model_type == 'chrombpnet':
-        return ChromBPNetWrapper(args)
+        model_wrapper = ChromBPNetWrapper(args)
+        if args.bias_scaled:
+            model_wrapper.model.bias = model_wrapper.init_bias(args.bias_scaled)
+        if args.chrombpnet_wo_bias:
+            model_wrapper.model.model = model_wrapper.init_chrombpnet_wo_bias(args.chrombpnet_wo_bias)
+        return model_wrapper
     else:
         raise ValueError(f"Unknown model type: {model_type}") 
 
