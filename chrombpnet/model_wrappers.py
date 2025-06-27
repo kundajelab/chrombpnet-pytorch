@@ -294,10 +294,6 @@ class ModelWrapper(LightningModule):
     def __init__(
         self,
         args,
-        # model: nn.Module,
-        # alpha: float = 1.0,
-        # beta: float = 1.0,
-        # verbose: bool = False,
         **kwargs
     ):
         """Initialize the model wrapper.
@@ -319,24 +315,23 @@ class ModelWrapper(LightningModule):
         self.beta = args.beta
         self.verbose = args.verbose
         
-                # model = None
-        if args.model_type == 'chrombpnet':
-            config = ChromBPNetConfig.from_argparse_args(args)
-            self.model = ChromBPNet(config)
-        elif args.model_type == 'bpnet':
-            self.model = BPNet(
-                out_dim=args.out_dim,
-                n_filters=args.n_filters, 
-                n_layers=args.n_layers, 
-                conv1_kernel_size=args.conv1_kernel_size,
-                profile_kernel_size=args.profile_kernel_size,
-                n_outputs=args.n_outputs, 
-                n_control_tracks=args.n_control_tracks, 
-                profile_output_bias=args.profile_output_bias, 
-                count_output_bias=args.count_output_bias, 
-            )
-        else:
-            raise ValueError(f"Model type {args.model_type} not supported")
+        # if args.model_type == 'chrombpnet':
+        #     config = ChromBPNetConfig.from_argparse_args(args)
+        #     self.model = ChromBPNet(config)
+        # elif args.model_type == 'bpnet':
+        #     self.model = BPNet(
+        #         out_dim=args.out_dim,
+        #         n_filters=args.n_filters, 
+        #         n_layers=args.n_layers, 
+        #         conv1_kernel_size=args.conv1_kernel_size,
+        #         profile_kernel_size=args.profile_kernel_size,
+        #         n_outputs=args.n_outputs, 
+        #         n_control_tracks=args.n_control_tracks, 
+        #         profile_output_bias=args.profile_output_bias, 
+        #         count_output_bias=args.count_output_bias, 
+        #     )
+        # else:
+        #     raise ValueError(f"Model type {args.model_type} not supported")
         # Initialize metrics storage
         self.metrics = {
             'train': {'preds': [], 'targets': []},
@@ -516,6 +511,19 @@ class BPNetWrapper(ModelWrapper):
     This wrapper extends the base ModelWrapper to handle BPNet-specific features
     such as profile and count predictions, and appropriate loss calculations.
     """
+    def __init__(self, args):
+        super().__init__(args)
+        self.model = BPNet(
+                out_dim=args.out_dim,
+                n_filters=args.n_filters, 
+                n_layers=args.n_layers, 
+                conv1_kernel_size=args.conv1_kernel_size,
+                profile_kernel_size=args.profile_kernel_size,
+                n_outputs=args.n_outputs, 
+                n_control_tracks=args.n_control_tracks, 
+                profile_output_bias=args.profile_output_bias, 
+                count_output_bias=args.count_output_bias, 
+            )
 
     def _step(self, batch, batch_idx, mode='train'):
         x = batch['onehot_seq'] # batch_size x 4 x seq_length
@@ -581,10 +589,12 @@ class ChromBPNetWrapper(BPNetWrapper):
         """
         super().__init__(args)
 
+        config = ChromBPNetConfig.from_argparse_args(args)
+        self.model = ChromBPNet(config)
         if args.bias_scaled:
-            self.bias_model = self.init_bias(args.bias_scaled)
+            self.model.bias = self.init_bias(args.bias_scaled)
         if args.chrombpnet_wo_bias:
-            self.chrombpnet_wo_bias_model = self.init_chrombpnet_wo_bias(args.chrombpnet_wo_bias)
+            self.model.model = self.init_chrombpnet_wo_bias(args.chrombpnet_wo_bias)
 
 
 def create_model_wrapper(
