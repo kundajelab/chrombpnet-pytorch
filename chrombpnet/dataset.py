@@ -159,7 +159,7 @@ class DataModule(L.LightningDataModule):
                 inputlen=config.in_window,                                        
                 outputlen=config.out_window,
                 max_jitter=0,
-                negative_sampling_ratio=-1 if config.data_type == 'profile' else config.negative_sampling_ratio,
+                negative_sampling_ratio=-1 if config.data_type != 'profile' else config.negative_sampling_ratio,
                 cts_bw_file=config.bigwig,
                 add_revcomp=False,
                 return_coords=False,

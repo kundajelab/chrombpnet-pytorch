@@ -315,24 +315,6 @@ class ModelWrapper(LightningModule):
         self.beta = args.beta
         self.verbose = args.verbose
         
-        # if args.model_type == 'chrombpnet':
-        #     config = ChromBPNetConfig.from_argparse_args(args)
-        #     self.model = ChromBPNet(config)
-        # elif args.model_type == 'bpnet':
-        #     self.model = BPNet(
-        #         out_dim=args.out_dim,
-        #         n_filters=args.n_filters, 
-        #         n_layers=args.n_layers, 
-        #         conv1_kernel_size=args.conv1_kernel_size,
-        #         profile_kernel_size=args.profile_kernel_size,
-        #         n_outputs=args.n_outputs, 
-        #         n_control_tracks=args.n_control_tracks, 
-        #         profile_output_bias=args.profile_output_bias, 
-        #         count_output_bias=args.count_output_bias, 
-        #     )
-        # else:
-        #     raise ValueError(f"Model type {args.model_type} not supported")
-        # Initialize metrics storage
         self.metrics = {
             'train': {'preds': [], 'targets': []},
             'val': {'preds': [], 'targets': []},
