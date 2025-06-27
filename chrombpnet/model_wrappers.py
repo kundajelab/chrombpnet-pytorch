@@ -126,6 +126,29 @@ def adjust_bias_model_logcounts(bias_model, dataloader, verbose=False, device=1)
         print('### delta', delta.mean(), flush=True)
     return bias_model
 
+def init_bias(bias, dataloader=None, verbose=False, device=1):
+        print(f"Loading bias model from {bias}")
+        bias_model = BPNet.from_keras(bias, name='bias')
+        bias_model.eval()  # Freeze the sub-model
+        for param in bias_model.parameters():
+            param.requires_grad = False
+
+        if dataloader is not None:
+            bias_model = adjust_bias_model_logcounts(bias_model, dataloader, verbose=verbose, device=device)
+        return bias_model
+
+def init_chrombpnet_wo_bias(chrombpnet_wo_bias, freeze=True):
+    print(f"Loading chrombpnet_wo_bias model from {chrombpnet_wo_bias}")
+    if chrombpnet_wo_bias.endswith('.h5'):
+        chrombpnet_wo_bias_model = BPNet.from_keras(chrombpnet_wo_bias)
+    else:
+        chrombpnet_wo_bias_model = BPNet.load_from_checkpoint(chrombpnet_wo_bias)
+    
+    if freeze:
+        for param in chrombpnet_wo_bias_model.parameters():
+            param.requires_grad = False
+
+    return chrombpnet_wo_bias_model
 
 class ControlWrapper(torch.nn.Module):
     """This wrapper automatically creates a control track of all zeroes.
@@ -344,28 +367,12 @@ class ModelWrapper(LightningModule):
         raise NotImplementedError("Subclasses must implement this method")
     
     def init_bias(self, bias, dataloader=None, verbose=False, device=1):
-        print(f"Loading bias model from {bias}")
-        self.model.bias = BPNet.from_keras(bias, name='bias')
-        self.model.bias.eval()  # Freeze the sub-model
-        for param in self.model.bias.parameters():
-            param.requires_grad = False
+        # print(f"Loading bias model from {bias}")
+        return init_bias(bias, dataloader=dataloader, verbose=verbose, device=device)
 
-        if dataloader is not None:
-            self.model.bias = adjust_bias_model_logcounts(self.model.bias, dataloader, verbose=verbose, device=device)
-        # self.model.init_bias(bias, dataloader=dataloader, verbose=verbose, device=device)
-
-    def init_chrombpnet_wo_bias(self, chrombpnet_wo_bias):
-        print(f"Loading chrombpnet_wo_bias model from {chrombpnet_wo_bias}")
-        if chrombpnet_wo_bias.endswith('.h5'):
-            self.model.conv_tower = BPNet.from_keras(chrombpnet_wo_bias)
-        else:
-            self.model.conv_tower.load_state_dict(torch.load(chrombpnet_wo_bias,map_location=self.device))
-
-        if not self.finetune:
-            print("Freezing the model")
-            self.model.conv_tower.eval()  # Freeze the sub-model
-            for param in self.model.conv_tower.parameters():
-                param.requires_grad = False
+    def init_chrombpnet_wo_bias(self, chrombpnet_wo_bias, freeze=True):
+        # print(f"Initializing chrombpnet_wo_bias model from {chrombpnet_wo_bias}")
+        return init_chrombpnet_wo_bias(chrombpnet_wo_bias, freeze=freeze)
 
     def _predict_on_dataloader(self, dataloader, func, **kwargs):
         outs = []
@@ -574,14 +581,10 @@ class ChromBPNetWrapper(BPNetWrapper):
         """
         super().__init__(args)
 
-        # Save model configuration in hyperparameters for checkpoint loading
-        # if hasattr(model, 'config'):
-        #     self.save_hyperparameters(ignore=['model'], model_config=model.config.__dict__)
-
         if args.bias_scaled:
-            self.init_bias(args.bias_scaled)
+            self.bias_model = self.init_bias(args.bias_scaled)
         if args.chrombpnet_wo_bias:
-            self.init_chrombpnet_wo_bias(args.chrombpnet_wo_bias)
+            self.chrombpnet_wo_bias_model = self.init_chrombpnet_wo_bias(args.chrombpnet_wo_bias)
 
 
 def create_model_wrapper(

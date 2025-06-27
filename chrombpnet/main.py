@@ -124,15 +124,15 @@ def get_parser() -> argparse.ArgumentParser:
 def train(args):
     data_config = DataConfig.from_argparse_args(args)
     loggers=[L.pytorch.loggers.CSVLogger(args.out_dir, name=args.name, version=f'fold_{args.fold}')]
-    args.out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
-    os.makedirs(args.out_dir, exist_ok=True)
+    out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
+    os.makedirs(out_dir, exist_ok=True)
 
-    if os.path.exists(os.path.join(args.out_dir, 'checkpoints/best_model.ckpt')):
-        raise ValueError(f"Model folder {args.out_dir}/checkpoints/best_model.ckpt already exists. Please delete the existing model or specify a new version.")
+    if os.path.exists(os.path.join(out_dir, 'checkpoints/best_model.ckpt')):
+        raise ValueError(f"Model folder {out_dir}/checkpoints/best_model.ckpt already exists. Please delete the existing model or specify a new version.")
     if args.bias_scaled is None:
         args.bias_scaled = os.path.join(args.data_dir, 'bias_scaled.h5')
-    log = create_logger(args.model_type, ch=True, fh=os.path.join(args.out_dir, 'train.log'), overwrite=True)
-    log.info(f'out_dir: {args.out_dir}')
+    log = create_logger(args.model_type, ch=True, fh=os.path.join(out_dir, 'train.log'), overwrite=True)
+    log.info(f'out_dir: {out_dir}')
     log.info(f'bias: {args.bias_scaled}')      
     log.info(f'adjust_bias: {args.adjust_bias}')
     log.info(f'data_type: {data_config.data_type}')
@@ -174,14 +174,15 @@ def train(args):
     )
     trainer.fit(model, datamodule)
     if args.model_type == 'chrombpnet' and not args.fast_dev_run:
-        torch.save(model.model.state_dict(), os.path.join(args.out_dir, 'checkpoints/chrombpnet_wo_bias.pt'))
+        torch.save(model.model.state_dict(), os.path.join(out_dir, 'checkpoints/chrombpnet_wo_bias.pt'))
 
 def load_model(args):
+    out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
     if args.checkpoint is None:
-        checkpoint = os.path.join(args.out_dir, 'checkpoints/best_model.ckpt')
+        checkpoint = os.path.join(out_dir, 'checkpoints/best_model.ckpt')
         if not os.path.exists(checkpoint):
             args.checkpoint = None
-            print(f'No checkpoint found in {args.out_dir}/checkpoints/best_model.ckpt')
+            print(f'No checkpoint found in {out_dir}/checkpoints/best_model.ckpt')
         else:
             args.checkpoint = checkpoint
             print(f'Loading checkpoint from {checkpoint}')
@@ -190,14 +191,14 @@ def load_model(args):
 
 
 def predict(args, model, datamodule=None):
-    args.out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
+    out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
     if datamodule is None:
         data_config = DataConfig.from_argparse_args(args)
         datamodule = DataModule(data_config)
 
     trainer = L.Trainer(logger=False, fast_dev_run=args.fast_dev_run, devices=args.gpu, val_check_interval=None) 
-    log = create_logger(args.model_type, ch=True, fh=os.path.join(args.out_dir, f'predict.log'), overwrite=True)
-    log.info(f'out_dir: {args.out_dir}')
+    log = create_logger(args.model_type, ch=True, fh=os.path.join(out_dir, f'predict.log'), overwrite=True)
+    log.info(f'out_dir: {out_dir}')
     log.info(f'model_type: {args.model_type}')
 
     if args.chrom == 'all':
@@ -210,12 +211,12 @@ def predict(args, model, datamodule=None):
         regions = dataset.regions
         log.info(f"{chrom}: {regions['is_peak'].value_counts()}")
         output = trainer.predict(model, dataloader)
-        model_metrics = compare_with_observed(output, regions, os.path.join(args.out_dir, 'evaluation', chrom))    
-        save_predictions(output, regions, data_config.chrom_sizes, os.path.join(args.out_dir, 'evaluation', chrom))
+        model_metrics = compare_with_observed(output, regions, os.path.join(out_dir, 'evaluation', chrom))    
+        save_predictions(output, regions, data_config.chrom_sizes, os.path.join(out_dir, 'evaluation', chrom))
 
 
 def interpret(args, model, datamodule=None):
-    args.out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
+    out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
     if datamodule is None:
         data_config = DataConfig.from_argparse_args(args)
         datamodule = DataModule(data_config)
@@ -225,7 +226,7 @@ def interpret(args, model, datamodule=None):
 
     tasks = ['profile', 'counts'] if args.shap == 'both' else [args.shap]
     for task in tasks:
-        run_modisco_and_shap(model.model.model, data_config.peaks, out_dir=os.path.join(args.out_dir, 'interpret'), batch_size=args.batch_size,
+        run_modisco_and_shap(model.model.model, data_config.peaks, out_dir=os.path.join(out_dir, 'interpret'), batch_size=args.batch_size,
             in_window=data_config.in_window, out_window=data_config.out_window, task=task, debug=args.debug)
     # out = model._mutagenesis(dataloader, debug=args.debug)
     # os.makedirs(os.path.join(out_dir, 'interpret'), exist_ok=True)

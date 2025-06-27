@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import pyBigWig
 import pyfaidx
-import deepdish
 import os
 
 def dna_to_one_hot(seqs):
@@ -404,6 +403,7 @@ def write_bigwig(data, regions, gs, bw_out, debug_chr=None, use_tqdm=False, outs
 
 
 def hdf5_to_bigwig(hdf5, regions, chrom_sizes, output_prefix, output_prefix_stats=None, debug_chr=None, tqdm=False):
+    import deepdish
 
     d = deepdish.io.load(hdf5, '/projected_shap/seq')
 
@@ -427,13 +427,13 @@ def hdf5_to_bigwig(hdf5, regions, chrom_sizes, output_prefix, output_prefix_stat
                         use_tqdm=tqdm)
     
 
-from weasyprint import HTML, CSS
 
 def html_to_pdf(input_html, output_pdf):
-	css = CSS(string='''
-		@page {
-			size: 1800mm 1300mm;
-			margin: 0in 0in 0in 0in;
-		}
-	''')
-	HTML(input_html).write_pdf(output_pdf, stylesheets=[css])
+    from weasyprint import HTML, CSS
+    css = CSS(string='''
+        @page {
+            size: 1800mm 1300mm;
+            margin: 0in 0in 0in 0in;
+        }
+    ''')
+    HTML(input_html).write_pdf(output_pdf, stylesheets=[css])

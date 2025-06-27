@@ -10,7 +10,6 @@ import pandas as pd
 import numpy as np
 import os
 import torch
-import deepdish
 import pyfaidx
 
 from .genome import motifs_datasets, hg38
@@ -255,197 +254,199 @@ def _validate_input(X, name, shape=None, dtype=None, min_value=None,
 
 
 def run_modisco_and_shap(
-        model, 
-        peaks, 
-        out_dir, 
-        fasta=hg38.fasta, 
-        in_window=2114, 
-        out_window=1000,
-        task='counts', 
-        batch_size=64, 
-        chrom_sizes=hg38.chrom_sizes,
-        sub_sample=None, 
-        meme_file=MEME_FILE, 
-        max_seqlets=1000_000, 
-        width=500, 
-        device='cuda',
-        debug=False
-    ):
-    if debug:
-        out_dir = os.path.join(out_dir, 'debug')
-    print("Modisco output directory:", out_dir)
-    out_dir = os.path.join(out_dir, task)
-    os.makedirs(out_dir, exist_ok=True)
-    n_control_tracks = model.n_control_tracks
-    if debug:
-        sub_sample = 30_000
-        max_seqlets = 50_000
+		model, 
+		peaks, 
+		out_dir, 
+		fasta=hg38.fasta, 
+		in_window=2114, 
+		out_window=1000,
+		task='counts', 
+		batch_size=64, 
+		chrom_sizes=hg38.chrom_sizes,
+		sub_sample=None, 
+		meme_file=MEME_FILE, 
+		max_seqlets=1000_000, 
+		width=500, 
+		device='cuda',
+		debug=False
+	):
+	if debug:
+		out_dir = os.path.join(out_dir, 'debug')
+	print("Modisco output directory:", out_dir)
+	out_dir = os.path.join(out_dir, task)
+	os.makedirs(out_dir, exist_ok=True)
+	n_control_tracks = model.n_control_tracks
+	if debug:
+		sub_sample = 30_000
+		max_seqlets = 50_000
 
-    if task == 'profile':
-        model = ProfileWrapper(model)
-    elif task == 'counts':
-        model = CountWrapper(model)
-    else:
-        raise ValueError(f"Task {task} not recognized. Must be 'profile' or 'counts'")
+	if task == 'profile':
+		model = ProfileWrapper(model)
+	elif task == 'counts':
+		model = CountWrapper(model)
+	else:
+		raise ValueError(f"Task {task} not recognized. Must be 'profile' or 'counts'")
 
-    # regions_df = pd.read_csv(peaks, sep='\t', header=None)
-    regions_df = load_region_df(peaks, chrom_sizes=chrom_sizes)
-    if sub_sample is not None and len(regions_df) > sub_sample:
-        regions_df = regions_df.sample(sub_sample, random_state=42).reset_index(drop=True)
-    print('Number of peaks:', len(regions_df))
+	# regions_df = pd.read_csv(peaks, sep='\t', header=None)
+	regions_df = load_region_df(peaks, chrom_sizes=chrom_sizes)
+	if sub_sample is not None and len(regions_df) > sub_sample:
+		regions_df = regions_df.sample(sub_sample, random_state=42).reset_index(drop=True)
+	print('Number of peaks:', len(regions_df))
 
-    seq = get_seq(regions_df, pyfaidx.Fasta(fasta), in_window)
-    # seq = extract_loci(regions_df, fasta, in_window, out='onehot', shift=0, pool_size=64)
-    # mask = (seq == 0.25).any(dim=2).any(dim=1)
-    # seq = seq[~mask]
-    # regions_df = regions_df[pd.Series(~mask)]
-
-
-    if n_control_tracks > 0:
-        args = [torch.zeros(seq.shape[0], n_control_tracks, out_window)]
-    else:
-        args = None
-
-    if isinstance(seq, np.ndarray):
-        seq = torch.tensor(seq.astype(np.float32))
-    if seq.shape[-1] == 4:
-        seq = seq.permute(0, 2, 1)
-
-            # print(i, seq[i]); import pdb; pdb.set_trace()
-            # _validate_input(X, "X", shape=(-1, -1, -1), ohe=True, ohe_dim=1)
-        # seq[i]
-    ## Mask those N values encoded as [0.25, 0.25, 0.25, 0.25]
-    mask = (seq == 0.25).any(dim=(1, 2))
-    seq = seq[~mask]
-    regions_df = regions_df[pd.Series(~mask)]
-
-    ## Mask those sequences that are all 0s
-    mask = (seq == 0).all(dim=1).any(dim=1)  # Shape: (N, L), True where all 0s in dim=1  
-    seq = seq[~mask]  # Filter sequences
-    regions_df = regions_df[pd.Series(~mask)]  # Filter regions
-
-    for i in range(seq.shape[0]):
-        try:
-            X = _validate_input(seq[i], name='seq', shape=(-1, -1), ohe=True, ohe_dim=0)
-        except:
-            print(i)
-            import pdb; pdb.set_trace()
-
-    attr = _deep_lift_shap(model, seq, batch_size=batch_size, verbose=True, args=args, warning_threshold=1e8, device=device)
-    # attr = _captum_deep_lift_shap(model, seq, batch_size=batch_size, verbose=True)
-    del model
-
-    shap_dict = generate_shap_dict(seq, attr)
-    print('Saving shap dict in h5 format')
-    np.object = object
-    deepdish.io.save(os.path.join(out_dir, f'shap.h5'), shap_dict, compression='blosc')
-
-    np.save(os.path.join(out_dir, 'attr.npy'), attr)
-    np.save(os.path.join(out_dir, 'ohe.npy'), seq)
-    regions_df.to_csv(os.path.join(out_dir, 'peaks.bed'), sep='\t', header=False, index=False)
-    os.system("sort -k1,1 -k2,2n {} > {}".format(os.path.join(out_dir, 'peaks.bed'), os.path.join(out_dir, 'peaks.sorted.bed')))
-    os.system("bgzip -c {} > {}".format(os.path.join(out_dir, 'peaks.sorted.bed'), os.path.join(out_dir, 'peaks.bed.gz')))
-    os.system("tabix -p bed {}".format(os.path.join(out_dir, 'peaks.bed.gz')))
-
-    print('Converting shap h5 to bigwig')
-    hdf5_to_bigwig(
-        os.path.join(out_dir, f'shap.h5'),
-        os.path.join(out_dir, 'peaks.bed'),
-        chrom_sizes,
-        output_prefix=os.path.join(out_dir, f'shap'),
-        debug_chr=None,
-        tqdm=True
-    )
-
-    os.system('modisco motifs -s {} -a {} -n {} -w {} -o {}'.format(
-        os.path.join(out_dir, 'ohe.npy'),  
-        os.path.join(out_dir, 'attr.npy'), max_seqlets, width, 
-        os.path.join(out_dir, f'modisco.h5')
-    ))
-
-    os.system('modisco report -i {} -o {} -m {}'.format(
-        os.path.join(out_dir, 'modisco.h5'),
-        os.path.join(out_dir, 'modisco_report'),
-        meme_file
-    ))
+	seq = get_seq(regions_df, pyfaidx.Fasta(fasta), in_window)
+	# seq = extract_loci(regions_df, fasta, in_window, out='onehot', shift=0, pool_size=64)
+	# mask = (seq == 0.25).any(dim=2).any(dim=1)
+	# seq = seq[~mask]
+	# regions_df = regions_df[pd.Series(~mask)]
 
 
-    html_to_pdf(
-        os.path.join(out_dir, 'modisco_report/motifs.html'),
-        os.path.join(out_dir, 'modisco_report.pdf')
-    )
+	if n_control_tracks > 0:
+		args = [torch.zeros(seq.shape[0], n_control_tracks, out_window)]
+	else:
+		args = None
+
+	if isinstance(seq, np.ndarray):
+		seq = torch.tensor(seq.astype(np.float32))
+	if seq.shape[-1] == 4:
+		seq = seq.permute(0, 2, 1)
+
+			# print(i, seq[i]); import pdb; pdb.set_trace()
+			# _validate_input(X, "X", shape=(-1, -1, -1), ohe=True, ohe_dim=1)
+		# seq[i]
+	## Mask those N values encoded as [0.25, 0.25, 0.25, 0.25]
+	mask = (seq == 0.25).any(dim=(1, 2))
+	seq = seq[~mask]
+	regions_df = regions_df[pd.Series(~mask)]
+
+	## Mask those sequences that are all 0s
+	mask = (seq == 0).all(dim=1).any(dim=1)  # Shape: (N, L), True where all 0s in dim=1  
+	seq = seq[~mask]  # Filter sequences
+	regions_df = regions_df[pd.Series(~mask)]  # Filter regions
+
+	for i in range(seq.shape[0]):
+		try:
+			X = _validate_input(seq[i], name='seq', shape=(-1, -1), ohe=True, ohe_dim=0)
+		except:
+			print(i)
+			import pdb; pdb.set_trace()
+
+	attr = _deep_lift_shap(model, seq, batch_size=batch_size, verbose=True, args=args, warning_threshold=1e8, device=device)
+	# attr = _captum_deep_lift_shap(model, seq, batch_size=batch_size, verbose=True)
+	del model
+
+	shap_dict = generate_shap_dict(seq, attr)
+	print('Saving shap dict in h5 format')
+	np.object = object
+	
+	import deepdish
+	deepdish.io.save(os.path.join(out_dir, f'shap.h5'), shap_dict, compression='blosc')
+
+	np.save(os.path.join(out_dir, 'attr.npy'), attr)
+	np.save(os.path.join(out_dir, 'ohe.npy'), seq)
+	regions_df.to_csv(os.path.join(out_dir, 'peaks.bed'), sep='\t', header=False, index=False)
+	os.system("sort -k1,1 -k2,2n {} > {}".format(os.path.join(out_dir, 'peaks.bed'), os.path.join(out_dir, 'peaks.sorted.bed')))
+	os.system("bgzip -c {} > {}".format(os.path.join(out_dir, 'peaks.sorted.bed'), os.path.join(out_dir, 'peaks.bed.gz')))
+	os.system("tabix -p bed {}".format(os.path.join(out_dir, 'peaks.bed.gz')))
+
+	print('Converting shap h5 to bigwig')
+	hdf5_to_bigwig(
+		os.path.join(out_dir, f'shap.h5'),
+		os.path.join(out_dir, 'peaks.bed'),
+		chrom_sizes,
+		output_prefix=os.path.join(out_dir, f'shap'),
+		debug_chr=None,
+		tqdm=True
+	)
+
+	os.system('modisco motifs -s {} -a {} -n {} -w {} -o {}'.format(
+		os.path.join(out_dir, 'ohe.npy'),  
+		os.path.join(out_dir, 'attr.npy'), max_seqlets, width, 
+		os.path.join(out_dir, f'modisco.h5')
+	))
+
+	os.system('modisco report -i {} -o {} -m {}'.format(
+		os.path.join(out_dir, 'modisco.h5'),
+		os.path.join(out_dir, 'modisco_report'),
+		meme_file
+	))
+
+
+	html_to_pdf(
+		os.path.join(out_dir, 'modisco_report/motifs.html'),
+		os.path.join(out_dir, 'modisco_report.pdf')
+	)
 
 
 def generate_shap_dict(seqs, scores):
-    if isinstance(seqs, torch.Tensor):
-        seqs = seqs.cpu().numpy()
-    if isinstance(scores, torch.Tensor):
-        scores = scores.cpu().numpy()
+	if isinstance(seqs, torch.Tensor):
+		seqs = seqs.cpu().numpy()
+	if isinstance(scores, torch.Tensor):
+		scores = scores.cpu().numpy()
 
-    assert(seqs.shape==scores.shape)
-    assert(seqs.shape[1]==4) # one hot encoding, which has bedn transposed
+	assert(seqs.shape==scores.shape)
+	assert(seqs.shape[1]==4) # one hot encoding, which has bedn transposed
 
-    # construct a dictionary for the raw shap scores and the
-    # the projected shap scores
-    # MODISCO workflow expects one hot sequences with shape (None,4,inputlen)
-    d = {
-            'raw': {'seq': seqs.astype(np.int8)},
-            'shap': {'seq': scores.astype(np.float16)},
-            'projected_shap': {'seq': (seqs*scores).astype(np.float16)}
-        }
+	# construct a dictionary for the raw shap scores and the
+	# the projected shap scores
+	# MODISCO workflow expects one hot sequences with shape (None,4,inputlen)
+	d = {
+			'raw': {'seq': seqs.astype(np.int8)},
+			'shap': {'seq': scores.astype(np.float16)},
+			'projected_shap': {'seq': (seqs*scores).astype(np.float16)}
+		}
 
-    return d
+	return d
 
 
 
-     
+	
 
 
 if __name__ == '__main__':
-    import argparse
-    import torch
-    from .genome import hg38
+	import argparse
+	import torch
+	from .genome import hg38
 
-    parser = argparse.ArgumentParser(description='Run modisco')
-    parser.add_argument('--model', type=str, required=True)
-    parser.add_argument('--peaks', type=str, required=True)
-    parser.add_argument('--out_dir', type=str, required=True)
-    parser.add_argument('--task', type=str, default='profile')
-    parser.add_argument('--batch_size', type=int, default=32)
-    parser.add_argument('--sub_sample', type=int, default=None)
-    parser.add_argument('--chrom_sizes', type=str, default=hg38.chrom_sizes)
-    parser.add_argument('--debug', action='store_true')
+	parser = argparse.ArgumentParser(description='Run modisco')
+	parser.add_argument('--model', type=str, required=True)
+	parser.add_argument('--peaks', type=str, required=True)
+	parser.add_argument('--out_dir', type=str, required=True)
+	parser.add_argument('--task', type=str, default='profile')
+	parser.add_argument('--batch_size', type=int, default=32)
+	parser.add_argument('--sub_sample', type=int, default=None)
+	parser.add_argument('--chrom_sizes', type=str, default=hg38.chrom_sizes)
+	parser.add_argument('--debug', action='store_true')
 
-    args = parser.parse_args()
+	args = parser.parse_args()
 
-    from .chrombpnet import BPNet
-    if args.model.endswith('.h5'):
-        model = BPNet.from_keras(args.model)
-    else:
-        model = BPNet.load_from_checkpoint(args.model)
-        
-    if args.task == 'both':
-        for task in ['counts', 'profile']:
-            run_modisco_and_shap(
-                model=model, 
-                peaks=args.peaks, 
-                out_dir=args.out_dir, 
-                task=task,
-                batch_size=args.batch_size, 
-                sub_sample=args.sub_sample, 
-                meme_file=meme_file,
-                chrom_sizes=args.chrom_sizes,
-                debug=args.debug
-            )
-    else:
-        run_modisco_and_shap(
-            model=model, 
-            peaks=args.peaks, 
-            out_dir=args.out_dir, 
-            task=args.task,
-            batch_size=args.batch_size, 
-            sub_sample=args.sub_sample, 
-            meme_file=meme_file,
-            chrom_sizes=args.chrom_sizes,
-            debug=args.debug
-        )
+	from .chrombpnet import BPNet
+	if args.model.endswith('.h5'):
+		model = BPNet.from_keras(args.model)
+	else:
+		model = BPNet.load_from_checkpoint(args.model)
+		
+	if args.task == 'both':
+		for task in ['counts', 'profile']:
+			run_modisco_and_shap(
+				model=model, 
+				peaks=args.peaks, 
+				out_dir=args.out_dir, 
+				task=task,
+				batch_size=args.batch_size, 
+				sub_sample=args.sub_sample, 
+				meme_file=meme_file,
+				chrom_sizes=args.chrom_sizes,
+				debug=args.debug
+			)
+	else:
+		run_modisco_and_shap(
+			model=model, 
+			peaks=args.peaks, 
+			out_dir=args.out_dir, 
+			task=args.task,
+			batch_size=args.batch_size, 
+			sub_sample=args.sub_sample, 
+			meme_file=meme_file,
+			chrom_sizes=args.chrom_sizes,
+			debug=args.debug
+		)
