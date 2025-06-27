@@ -129,8 +129,10 @@ def train(args):
 
     if os.path.exists(os.path.join(args.out_dir, 'checkpoints/best_model.ckpt')):
         raise ValueError(f"Model folder {args.out_dir}/checkpoints/best_model.ckpt already exists. Please delete the existing model or specify a new version.")
+    if args.bias_scaled is None:
+        args.bias_scaled = os.path.join(args.data_dir, 'bias_scaled.h5')
     log = create_logger(args.model_type, ch=True, fh=os.path.join(args.out_dir, 'train.log'), overwrite=True)
-    log.info(args.out_dir)
+    log.info(f'out_dir: {args.out_dir}')
     log.info(f'bias: {args.bias_scaled}')      
     log.info(f'adjust_bias: {args.adjust_bias}')
     log.info(f'data_type: {data_config.data_type}')
@@ -147,8 +149,7 @@ def train(args):
     args.alpha = datamodule.median_count / 10
     log.info(f'alpha: {args.alpha}')
 
-    if args.bias_scaled is None:
-        args.bias_scaled = os.path.join(args.data_dir, 'bias_scaled.h5')
+
     model = create_model_wrapper(args)
     if args.adjust_bias:
         adjust_bias_model_logcounts(model.model.bias, datamodule.negative_dataloader())
@@ -196,8 +197,8 @@ def predict(args, model, datamodule=None):
 
     trainer = L.Trainer(logger=False, fast_dev_run=args.fast_dev_run, devices=args.gpu, val_check_interval=None) 
     log = create_logger(args.model_type, ch=True, fh=os.path.join(args.out_dir, f'predict.log'), overwrite=True)
-    log.info(args.out_dir)
-    log.info(f'{args.model_type}')
+    log.info(f'out_dir: {args.out_dir}')
+    log.info(f'model_type: {args.model_type}')
 
     if args.chrom == 'all':
         chroms = datamodule.chroms
