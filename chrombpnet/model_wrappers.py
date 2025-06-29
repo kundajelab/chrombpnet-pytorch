@@ -142,7 +142,7 @@ def init_chrombpnet_wo_bias(chrombpnet_wo_bias, freeze=True):
     if chrombpnet_wo_bias.endswith('.h5'):
         chrombpnet_wo_bias_model = BPNet.from_keras(chrombpnet_wo_bias)
     elif chrombpnet_wo_bias.endswith('.pt'):
-        chrombpnet_wo_bias_model = BPNet.load_state_dict(torch.load(chrombpnet_wo_bias), map_location='cpu')
+        chrombpnet_wo_bias_model = BPNet.load_state_dict(torch.load(chrombpnet_wo_bias, map_location='cpu'))
     elif chrombpnet_wo_bias.endswith('.ckpt'):
         chrombpnet_wo_bias_model = BPNet.load_from_checkpoint(chrombpnet_wo_bias)
     
