@@ -15,7 +15,7 @@ import json
 from .parse_utils import add_argparse_args, from_argparse_args, parse_argparser, get_init_arguments_and_types
 from .genome import hg38, hg38_datasets, mm10, mm10_datasets
 
-@dataclass
+
 class DataConfig:
     """Base configuration class for data handling.
     
