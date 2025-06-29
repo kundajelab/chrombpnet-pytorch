@@ -140,17 +140,18 @@ def init_bias(bias, dataloader=None, verbose=False, device=1):
 def init_chrombpnet_wo_bias(chrombpnet_wo_bias, freeze=True):
     print(f"Loading chrombpnet_wo_bias model from {chrombpnet_wo_bias}")
     if chrombpnet_wo_bias.endswith('.h5'):
-        chrombpnet_wo_bias_model = BPNet.from_keras(chrombpnet_wo_bias)
+        model = BPNet.from_keras(chrombpnet_wo_bias)
     elif chrombpnet_wo_bias.endswith('.pt'):
-        chrombpnet_wo_bias_model = BPNet(n_filters=512, n_layers=8).load_state_dict(torch.load(chrombpnet_wo_bias, map_location='cpu'))
+        model = BPNet(n_filters=512, n_layers=8)
+        model.load_state_dict(torch.load(chrombpnet_wo_bias, map_location='cpu'))
     elif chrombpnet_wo_bias.endswith('.ckpt'):
-        chrombpnet_wo_bias_model = BPNet.load_from_checkpoint(chrombpnet_wo_bias)
+        model = BPNet.load_from_checkpoint(chrombpnet_wo_bias)
     
     if freeze:
-        for param in chrombpnet_wo_bias_model.parameters():
+        for param in model.parameters():
             param.requires_grad = False
 
-    return chrombpnet_wo_bias_model
+    return model
 
 class ControlWrapper(torch.nn.Module):
     """This wrapper automatically creates a control track of all zeroes.
