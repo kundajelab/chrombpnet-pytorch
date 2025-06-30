@@ -207,7 +207,7 @@ def hg19_datasets():
             base_url="https://zenodo.org/records/12193595/files/",
             env="GENOME_DATA_DIR",  # The user can overwrite the storage path by setting this environment variable.
             registry={
-                "hg19.fa": "md5:806c02398f5ac5da8ffd6da2d1d5d1a9",
+                "hg19.fa.gz": "md5:806c02398f5ac5da8ffd6da2d1d5d1a9",
                 "hg19.gtf.gz": "md5:bd83e28270e595d3bde6bfcb21c9748f",
                 "hg19.chrom.sizes": "md5:b3b0fcf79b5477ab0b3af02e81eac8dc",
             },
@@ -346,7 +346,7 @@ hg38 = GRCh38
 
 GRCh37 = Genome(
     fasta=lambda : hg19_datasets().fetch(
-        "hg19.fa", 
+        "hg19.fa.gz", 
         progressbar=True, processor=Decompress(method="gzip", name="hg19.fa")
     ),
     annotation=lambda : hg19_datasets().fetch(
