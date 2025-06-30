@@ -199,6 +199,26 @@ def mm10_datasets():
         )
     return EnhancedDataset(_create_dataset)
 
+def hg19_datasets():
+    """Get enhanced hg19 dataset."""
+    def _create_dataset():
+        return pooch.create(
+            path=pooch.os_cache("genome/hg19"),
+            base_url="https://zenodo.org/records/12193595/files/",
+            env="GENOME_DATA_DIR",  # The user can overwrite the storage path by setting this environment variable.
+            registry={
+                "hg19.fa": "md5:806c02398f5ac5da8ffd6da2d1d5d1a9",
+                "hg19.gtf.gz": "md5:bd83e28270e595d3bde6bfcb21c9748f",
+                "hg19.chrom.sizes": "md5:b3b0fcf79b5477ab0b3af02e81eac8dc",
+            },
+            urls={
+                "hg19.fa": "https://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/hg19.fa.gz",
+                "hg19.gtf.gz": "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz",
+                "hg19.chrom.sizes": "https://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/hg19.chrom.sizes",
+            },
+        )
+    return EnhancedDataset(_create_dataset)
+
 class Genome:
     """
     A class that encapsulates information about a genome, including its FASTA sequence,
@@ -323,6 +343,22 @@ GRCh38 = Genome(
     ),
     )
 hg38 = GRCh38
+
+GRCh37 = Genome(
+    fasta=lambda : hg19_datasets().fetch(
+        "hg19.fa", 
+        progressbar=True, processor=Decompress(method="gzip", name="hg19.fa")
+    ),
+    annotation=lambda : hg19_datasets().fetch(
+        "hg19.gtf.gz", 
+        progressbar=True
+    ),
+    chrom_sizes= hg19_datasets().fetch(
+        "hg19.chrom.sizes", 
+        progressbar=True
+    ),
+)
+hg19 = GRCh37
 
 GRCm38 = Genome(
     fasta=lambda : mm10_datasets().fetch(
