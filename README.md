@@ -45,7 +45,7 @@ pip install git+https://github.com/jsxlei/chrombpnet-pytorch.git
 ## QuickStart
 ### Before training
 - Download the [genome](https://zenodo.org/records/12193595) or use your own genome data
-- Download the [K562 example ATAC data](https://zenodo.org/records/15713376) or use your own ATAC data
+- Download the [ENCODE K562 ATAC data](https://zenodo.org/records/15713376) or use your own ATAC data
 
 ### Bias-factorized ChromBPNet training
 Please refer to [data_config](https://github.com/kundajelab/chrombpnet-pytorch/chrombpnet/data_config.py) to define your own dataset or pass them through command.
@@ -61,14 +61,18 @@ chrombpnet train --peaks <peak_file> --negatives <negative_file> --bigwig <unstr
 
 ### Predict with pretrained model in .h5 format or .cpkt or .pt
 ```
-chrombpnet predict --checkpoint chrombpnet_wo_bias.h5/best_model.cpkt/chrombpnet_wo_bias.pt -o <output_path>
+chrombpnet predict --data_dir <data_path> --checkpoint chrombpnet_wo_bias.h5/best_model.cpkt/chrombpnet_wo_bias.pt -o <output_path>
 ```
 
 ### Interpret by calculating attribution
 ```
-chrombpnet interpret --checkpoint <model_cpkt/model_h5> -o <output_path>
+chrombpnet interpret --data_dir <data_path> --checkpoint <model_cpkt/model_h5> -o <output_path>
 ```
 
+### Run full pipeline including training, predicting and interpreting
+```
+chrombpnet --data_dir <data_path> -o <output_path>
+```
 #### Input Format
 
 - `--bigwig` 

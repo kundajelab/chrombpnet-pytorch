@@ -65,7 +65,7 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
                        help='Type of SHAP analysis')
     parser.add_argument('--dev', action='store_true',
                        help='Run in development mode')
-    parser.add_argument('--chrom', type=str, default='val',
+    parser.add_argument('--chrom', type=str, default='test',
                        help='Chromosome to analyze')
     parser.add_argument('--model_type', type=str, default='chrombpnet',
                        help='Type of model to use')
@@ -82,6 +82,10 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
                        help='ChromBPNet model without bias')
     parser.add_argument('--verbose', action='store_true', default=False,
                        help='Verbose output')
+    parser.add_argument('--precision', type=int, default=32,
+                            help='Training precision (16, 32, or 64)')
+    parser.add_argument('--max_epochs', type=int, default=100,
+                            help='Maximum number of training epochs')
     
     # Add model-specific arguments
     ChromBPNetConfig.add_argparse_args(parser)
@@ -94,29 +98,23 @@ def get_parser() -> argparse.ArgumentParser:
         Configured ArgumentParser instance
     """
     parser = argparse.ArgumentParser(description='Train or test ChromBPNet model.')
-    subparsers = parser.add_subparsers(dest='command', required=True)
+    subparsers = parser.add_subparsers(dest='command')
 
     # Train sub-command
     train_parser = subparsers.add_parser('train', help='Train the ChromBPNet model.')
-    train_parser.add_argument('--max_epochs', type=int, default=100,
-                            help='Maximum number of training epochs')
-    train_parser.add_argument('--precision', type=int, default=32,
-                            help='Training precision (16, 32, or 64)')
-    train_parser.add_argument('--use_wandb', action='store_true', default=True,
-                            help='Use Weights & Biases logger')
-    train_parser.add_argument('--logger', type=str, default='csv',
-                            help='Logger type to use')
     add_common_args(train_parser)
 
     # Predict sub-command
     predict_parser = subparsers.add_parser('predict', help='Test or predict with the ChromBPNet model.')
-    predict_parser.set_defaults(plot=True)
     add_common_args(predict_parser)
 
     # Interpret sub-command
     interpret_parser = subparsers.add_parser('interpret', help='Interpret the ChromBPNet model.')
-
     add_common_args(interpret_parser)
+
+    add_common_args(parser)
+
+    parser.set_defaults(command='pipeline')
 
     return parser
 
@@ -200,6 +198,7 @@ def predict(args, model, datamodule=None):
     log = create_logger(args.model_type, ch=True, fh=os.path.join(out_dir, f'predict.log'), overwrite=True)
     log.info(f'out_dir: {out_dir}')
     log.info(f'model_type: {args.model_type}')
+    log.info(f'chrom: {args.chrom}')
 
     if args.chrom == 'all':
         chroms = datamodule.chroms
@@ -226,7 +225,7 @@ def interpret(args, model, datamodule=None):
 
     tasks = ['profile', 'counts'] if args.shap == 'both' else [args.shap]
     for task in tasks:
-        run_modisco_and_shap(model.model.model, data_config.peaks, out_dir=os.path.join(out_dir, 'interpret'), batch_size=args.batch_size,
+        run_modisco_and_shap(model.model.model, regions, out_dir=os.path.join(out_dir, 'interpret'), batch_size=args.batch_size,
             in_window=data_config.in_window, out_window=data_config.out_window, task=task, debug=args.debug)
     # out = model._mutagenesis(dataloader, debug=args.debug)
     # os.makedirs(os.path.join(out_dir, 'interpret'), exist_ok=True)
@@ -237,17 +236,23 @@ def main():
     parser = get_parser()
     args = parser.parse_args()
 
-    datamodule = None
     if args.command == 'train':
         train(args)
         model = load_model(args)
-        predict(args, model, datamodule)
+        predict(args, model)
     elif args.command == 'predict':
         model = load_model(args)
         predict(args, model)
     elif args.command == 'interpret':
         model = load_model(args)
         interpret(args, model)
+    elif args.command == 'pipeline':
+        train(args)
+        model = load_model(args)
+        predict(args, model)
+        interpret(args, model)
+    else:
+        raise ValueError(f'Invalid command: {args.command}')
 
 
                 
