@@ -204,7 +204,7 @@ def hg19_datasets():
     def _create_dataset():
         return pooch.create(
             path=pooch.os_cache("genome/hg19"),
-            base_url="https://zenodo.org/records/12193595/files/",
+            base_url="https://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/",
             env="GENOME_DATA_DIR",  # The user can overwrite the storage path by setting this environment variable.
             registry={
                 "hg19.fa.gz": "md5:806c02398f5ac5da8ffd6da2d1d5d1a9",
