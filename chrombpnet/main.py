@@ -225,8 +225,8 @@ def interpret(args, model, datamodule=None):
 
     tasks = ['profile', 'counts'] if args.shap == 'both' else [args.shap]
     for task in tasks:
-        run_modisco_and_shap(model.model.model, regions, out_dir=os.path.join(out_dir, 'interpret'), batch_size=args.batch_size,
-            in_window=data_config.in_window, out_window=data_config.out_window, task=task, debug=args.debug)
+        run_modisco_and_shap(model.model.model, data_config.peaks, out_dir=os.path.join(out_dir, 'interpret'), batch_size=args.batch_size,
+            in_window=data_config.in_window, out_window=data_config.out_window, task=task, debug=True)
     # out = model._mutagenesis(dataloader, debug=args.debug)
     # os.makedirs(os.path.join(out_dir, 'interpret'), exist_ok=True)
     # np.save(os.path.join(out_dir, 'interpret', 'mutagenesis.npy'), out)

@@ -432,6 +432,7 @@ def hdf5_to_bigwig(hdf5, regions, chrom_sizes, output_prefix, output_prefix_stat
     # gs = chrom_sizes
     regions = get_regions(regions, SEQLEN)
     chr_list = set([region[0] for region in regions])
+    chrom_sizes = read_chrom_sizes(chrom_sizes)
     chrom_sizes = [(x, v) for x, v in chrom_sizes.items() if x in chr_list]
     
     assert(d.shape[0] == len(regions))

@@ -210,6 +210,7 @@ def hg19_datasets():
                 "hg19.fa.gz": "md5:806c02398f5ac5da8ffd6da2d1d5d1a9",
                 "hg19.gtf.gz": "md5:bd83e28270e595d3bde6bfcb21c9748f",
                 "hg19.chrom.sizes": "md5:b3b0fcf79b5477ab0b3af02e81eac8dc",
+                "hg19.fa": "md5:530d89d3ef07fdb2a9b3c701fb4ca486",
             },
             urls={
                 "hg19.fa": "https://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/hg19.fa.gz",
@@ -346,7 +347,7 @@ hg38 = GRCh38
 
 GRCh37 = Genome(
     fasta=lambda : hg19_datasets().fetch(
-        "hg19.fa.gz", 
+        "hg19.fa", 
         progressbar=True, processor=Decompress(method="gzip", name="hg19.fa")
     ),
     annotation=lambda : hg19_datasets().fetch(
