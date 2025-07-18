@@ -270,8 +270,8 @@ def run_modisco_and_shap(
 		device='cuda',
 		debug=False
 	):
-	if debug:
-		out_dir = os.path.join(out_dir, 'debug')
+	# if debug:
+		# out_dir = os.path.join(out_dir, 'debug')
 	print("Modisco output directory:", out_dir)
 	out_dir = os.path.join(out_dir, task)
 	os.makedirs(out_dir, exist_ok=True)
@@ -434,7 +434,7 @@ if __name__ == '__main__':
 				task=task,
 				batch_size=args.batch_size, 
 				sub_sample=args.sub_sample, 
-				meme_file=meme_file,
+				meme_file=MEME_FILE,
 				chrom_sizes=args.chrom_sizes,
 				debug=args.debug
 			)
@@ -446,7 +446,7 @@ if __name__ == '__main__':
 			task=args.task,
 			batch_size=args.batch_size, 
 			sub_sample=args.sub_sample, 
-			meme_file=meme_file,
+			meme_file=MEME_FILE,
 			chrom_sizes=args.chrom_sizes,
 			debug=args.debug
 		)

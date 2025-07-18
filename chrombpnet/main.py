@@ -86,6 +86,10 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
                             help='Training precision (16, 32, or 64)')
     parser.add_argument('--max_epochs', type=int, default=100,
                             help='Maximum number of training epochs')
+    parser.add_argument('--gradient_clip', type=float, default=None,
+                            help='Gradient clipping value')
+    parser.add_argument('--force', action='store_true', default=False,
+                            help='Force training even if model already exists')
     
     # Add model-specific arguments
     ChromBPNetConfig.add_argparse_args(parser)
@@ -125,7 +129,7 @@ def train(args):
     out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
     os.makedirs(out_dir, exist_ok=True)
 
-    if os.path.exists(os.path.join(out_dir, 'checkpoints/best_model.ckpt')):
+    if os.path.exists(os.path.join(out_dir, 'checkpoints/best_model.ckpt')) and not args.force:
         raise ValueError(f"Model folder {out_dir}/checkpoints/best_model.ckpt already exists. Please delete the existing model or specify a new version.")
     if args.bias_scaled is None:
         args.bias_scaled = os.path.join(args.data_dir, 'bias_scaled.h5')
@@ -168,11 +172,12 @@ def train(args):
         logger=loggers, # L.pytorch.loggers.TensorBoardLogger
         fast_dev_run=args.fast_dev_run,
         precision=args.precision,
+        gradient_clip_val=args.gradient_clip,
         # precision="bf16"
     )
     trainer.fit(model, datamodule)
     if args.model_type == 'chrombpnet' and not args.fast_dev_run:
-        torch.save(model.model.state_dict(), os.path.join(out_dir, 'checkpoints/chrombpnet_wo_bias.pt'))
+        torch.save(model.model.model.state_dict(), os.path.join(out_dir, 'checkpoints/chrombpnet_wo_bias.pt'))
 
 def load_model(args):
     out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
