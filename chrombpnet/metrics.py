@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 # from matplotlib.colors import Normalize 
 from scipy.interpolate import interpn
 from .metrics_utils import * 
-from .data_utils import write_bigwig, read_chrom_sizes
+from .data_utils import write_bigwig, read_chrom_sizes, expand_3col_to_10col
 from .genome import hg38_datasets   
 
 plt.rcParams["figure.figsize"]=10,5
@@ -94,6 +94,8 @@ def save_predictions(output, regions, chrom_sizes, out_dir='./'):
     with open(chrom_sizes) as f:
         gs = [x.strip().split('\t') for x in f]
     gs = [(x[0], int(x[1])) for x in gs if len(x)==2]
+    if regions.shape[1] < 10:
+        regions = expand_3col_to_10col(regions)
     # gs = read_chrom_sizes(chrom_sizes); print(gs)
 
     seqlen = 1000
@@ -118,7 +120,21 @@ def save_predictions(output, regions, chrom_sizes, out_dir='./'):
 
     return
 
-def compare_with_observed(output, regions, out_dir='./'):
+def load_output_to_regions(output, regions, out_dir='./'):
+    """
+    Load the output to regions
+    """
+    regions = regions.reset_index(drop=True).copy()
+    os.makedirs(out_dir, exist_ok=True)
+    parsed_output = {key: np.concatenate([batch[key] for batch in output]) for key in output[0]}
+    if 'is_peak' in regions.columns:
+        regions['is_peak'] = regions['is_peak'].astype(int)
+    regions['pred_count'] = parsed_output['pred_count']
+    regions['true_count'] = parsed_output['true_count']
+    regions.to_csv(os.path.join(out_dir, 'regions.csv'), sep='\t', index=False)
+    return regions, parsed_output
+
+def compare_with_observed(regions, parsed_output, out_dir='./', tag='all_regions'):
     """
     """
     os.makedirs(out_dir, exist_ok=True)
@@ -130,7 +146,7 @@ def compare_with_observed(output, regions, out_dir='./'):
     # regions_array = [[x[0], int(x[1])+int(x[9])-seqlen//2, int(x[1])+int(x[9])+seqlen//2, int(x[1])+int(x[9])] for x in np.array(regions.values)]
     
     # # parse output
-    parsed_output = {key: np.concatenate([batch[key] for batch in output]) for key in output[0]}
+    # parsed_output = {key: np.concatenate([batch[key] for batch in output]) for key in output[0]}
 
     # data = softmax(parsed_output['pred_profile']) * (np.expand_dims(np.exp(parsed_output['pred_count']),axis=1))
 
@@ -147,25 +163,23 @@ def compare_with_observed(output, regions, out_dir='./'):
     # write_predictions_h5py(parsed_output['pred_profile_prob'], parsed_output['true_profile'], coords, out_dir)
 
     # regions = pd.DataFrame(coords, columns=['chrom', 'summit', 'forward_reverse', 'is_peak'])
-    regions['is_peak'] = regions['is_peak'].astype(int)
-    regions['pred_count'] = parsed_output['pred_count']
-    regions['true_count'] = parsed_output['true_count']
-    regions.to_csv(os.path.join(out_dir, 'regions.csv'), sep='\t', index=False)
+    # regions['is_peak'] = regions['is_peak'].astype(int)
+    # regions['pred_count'] = parsed_output['pred_count']
+    # regions['true_count'] = parsed_output['true_count']
+    # regions.to_csv(os.path.join(out_dir, 'regions.csv'), sep='\t', index=False)
 
-    peak_regions = regions[regions['is_peak']==1]
-    peak_index = peak_regions.index
     # print(peak_regions.head())
 
     metrics_dictionary={}
     metrics_dictionary["counts_metrics"] = {}
-    metrics_dictionary["profile_metrics"] = {}
     # save count metrics
-    spearman_cor, pearson_cor, mse = counts_metrics(parsed_output['true_count'], parsed_output['pred_count'], os.path.join(out_dir, 'all_regions'))
+    spearman_cor, pearson_cor, mse = counts_metrics(regions['true_count'], regions['pred_count'], os.path.join(out_dir, 'all_regions'))
     metrics_dictionary["counts_metrics"]["peaks_and_nonpeaks"] = {}
     metrics_dictionary["counts_metrics"]["peaks_and_nonpeaks"]["spearmanr"] = spearman_cor
     metrics_dictionary["counts_metrics"]["peaks_and_nonpeaks"]["pearsonr"] = pearson_cor
     metrics_dictionary["counts_metrics"]["peaks_and_nonpeaks"]["mse"] = mse
 
+    metrics_dictionary["profile_metrics"] = {}
     mnll_pw, mnll_norm, jsd_pw, jsd_norm, jsd_rnd, jsd_rnd_norm, mnll_rnd, mnll_rnd_norm = profile_metrics(parsed_output['true_profile'], softmax(parsed_output['pred_profile']))
     plot_histogram(jsd_pw, jsd_rnd, os.path.join(out_dir, 'all_regions_jsd'), '')
     metrics_dictionary["profile_metrics"]["peaks_and_nonpeaks"] = {}
@@ -173,22 +187,28 @@ def compare_with_observed(output, regions, out_dir='./'):
     metrics_dictionary["profile_metrics"]["peaks_and_nonpeaks"]["median_norm_jsd"] = np.nanmedian(jsd_norm)
     
 
-    spearman_cor, pearson_cor, mse = counts_metrics(peak_regions['true_count'], peak_regions['pred_count'], os.path.join(out_dir, 'peaks'))
-    metrics_dictionary["counts_metrics"]["peaks"] = {}
-    metrics_dictionary["counts_metrics"]["peaks"]["spearmanr"] = spearman_cor
-    metrics_dictionary["counts_metrics"]["peaks"]["pearsonr"] = pearson_cor
-    metrics_dictionary["counts_metrics"]["peaks"]["mse"] = mse
+    if 'is_peak' in regions.columns:
+        peak_regions = regions[regions['is_peak']==1].copy()
+        peak_index = peak_regions.index
+        peak_regions = peak_regions.reset_index(drop=True)
+        print('peak_regions', peak_regions.head())
 
-    mnll_pw, mnll_norm, jsd_pw, jsd_norm, jsd_rnd, jsd_rnd_norm, mnll_rnd, mnll_rnd_norm = profile_metrics(parsed_output['true_profile'][peak_index], softmax(parsed_output['pred_profile'])[peak_index])
-    plot_histogram(jsd_pw, jsd_rnd, os.path.join(out_dir, 'peaks_jsd'), '')
-    metrics_dictionary["profile_metrics"]["peaks"] = {}
-    metrics_dictionary["profile_metrics"]["peaks"]["median_jsd"] = np.nanmedian(jsd_pw)        
-    metrics_dictionary["profile_metrics"]["peaks"]["median_norm_jsd"] = np.nanmedian(jsd_norm)
+        spearman_cor, pearson_cor, mse = counts_metrics(peak_regions['true_count'], peak_regions['pred_count'], os.path.join(out_dir, 'peaks'))
+        metrics_dictionary["counts_metrics"]["peaks"] = {}
+        metrics_dictionary["counts_metrics"]["peaks"]["spearmanr"] = spearman_cor
+        metrics_dictionary["counts_metrics"]["peaks"]["pearsonr"] = pearson_cor
+        metrics_dictionary["counts_metrics"]["peaks"]["mse"] = mse
+
+        mnll_pw, mnll_norm, jsd_pw, jsd_norm, jsd_rnd, jsd_rnd_norm, mnll_rnd, mnll_rnd_norm = profile_metrics(parsed_output['true_profile'][peak_index], softmax(parsed_output['pred_profile'])[peak_index])
+        plot_histogram(jsd_pw, jsd_rnd, os.path.join(out_dir, 'peaks_jsd'), '')
+        metrics_dictionary["profile_metrics"]["peaks"] = {}
+        metrics_dictionary["profile_metrics"]["peaks"]["median_jsd"] = np.nanmedian(jsd_pw)        
+        metrics_dictionary["profile_metrics"]["peaks"]["median_norm_jsd"] = np.nanmedian(jsd_norm)
 
     print(json.dumps(metrics_dictionary, indent=4, default=lambda o: float(o)))
 
-    os.makedirs(out_dir, exist_ok=True)
-    with open(os.path.join(out_dir, 'metrics.json'), 'w') as fp:
+    # os.makedirs(out_dir, exist_ok=True)
+    with open(os.path.join(out_dir, f'metrics_{tag}.json'), 'w') as fp:
         json.dump(metrics_dictionary, fp,  indent=4, default=lambda x: float(x))
     return metrics_dictionary
 

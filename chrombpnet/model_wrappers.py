@@ -552,6 +552,19 @@ class BPNetWrapper(ModelWrapper):
         return optimizer
 
 
+    def predict(self, x, forward_only=True):
+        y_profile, y_count = self(x)
+        y_count = torch.exp(y_count)
+
+        if not forward_only:
+            y_profile_revcomp, y_count_revcomp = self(x[:, ::-1, ::-1])
+            y_count_revcomp = torch.exp(y_count_revcomp)
+            y_profile = (y_profile + y_profile_revcomp) / 2
+            y_count = (y_count + y_count_revcomp) / 2
+
+        return y_profile.cpu().numpy(), y_count.cpu().numpy()
+
+
 class ChromBPNetWrapper(BPNetWrapper):
     """Wrapper for ChromBPNet model with specific configurations and loss functions.
     

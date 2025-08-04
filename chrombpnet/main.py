@@ -41,7 +41,7 @@ from chrombpnet.model_wrappers import create_model_wrapper, load_pretrained_mode
 from chrombpnet.dataset import DataModule
 from chrombpnet.data_config import DataConfig
 from chrombpnet.genome import hg38_datasets, mm10_datasets
-from chrombpnet.metrics import compare_with_observed, save_predictions
+from chrombpnet.metrics import compare_with_observed, save_predictions, load_output_to_regions
 from chrombpnet.interpret import run_modisco_and_shap 
 from chrombpnet.logger import create_logger
 
@@ -115,6 +115,9 @@ def get_parser() -> argparse.ArgumentParser:
     # Interpret sub-command
     interpret_parser = subparsers.add_parser('interpret', help='Interpret the ChromBPNet model.')
     add_common_args(interpret_parser)
+
+    reproduce_parser = subparsers.add_parser('reproduce', help='Reproduce the ChromBPNet model.')
+    add_common_args(reproduce_parser)
 
     add_common_args(parser)
 
@@ -193,30 +196,49 @@ def load_model(args):
     return model
 
 
-def predict(args, model, datamodule=None):
+def predict(args, model, datamodule=None, mode='predict'):
     out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
     if datamodule is None:
         data_config = DataConfig.from_argparse_args(args)
         datamodule = DataModule(data_config)
 
     trainer = L.Trainer(logger=False, fast_dev_run=args.fast_dev_run, devices=args.gpu, val_check_interval=None) 
+    os.makedirs(os.path.join(out_dir, mode), exist_ok=True)
     log = create_logger(args.model_type, ch=True, fh=os.path.join(out_dir, f'predict.log'), overwrite=True)
     log.info(f'out_dir: {out_dir}')
     log.info(f'model_type: {args.model_type}')
+    log.info(f'checkpoint: {args.checkpoint}')
+    log.info(f'peaks: {data_config.peaks}')
+    log.info(f'negatives: {data_config.negatives}')
+    log.info(f'bigwig: {data_config.bigwig}')
+    log.info(f'fasta: {data_config.fasta}')
+    log.info(f'chrom_sizes: {data_config.chrom_sizes}')
     log.info(f'chrom: {args.chrom}')
 
-    if args.chrom == 'all':
-        chroms = datamodule.chroms
-    else:
-        chroms = [args.chrom]
+    chrom = args.chrom
+    dataloader, dataset = datamodule.chrom_dataloader(args.chrom)
+    # log.info(f"{chrom}: {regions['is_peak'].value_counts()}")
+    output = trainer.predict(model, dataloader)
+    regions, parsed_output = load_output_to_regions(output, dataset.regions, os.path.join(out_dir, mode, chrom))
+    # import pdb; pdb.set_trace()
+    model_metrics = compare_with_observed(regions, parsed_output, os.path.join(out_dir, mode, chrom))     
+    save_predictions(output, regions, data_config.chrom_sizes, os.path.join(out_dir, mode, chrom))
 
-    for chrom in chroms:
-        dataloader, dataset = datamodule.chrom_dataloader(chrom)
-        regions = dataset.regions
-        log.info(f"{chrom}: {regions['is_peak'].value_counts()}")
-        output = trainer.predict(model, dataloader)
-        model_metrics = compare_with_observed(output, regions, os.path.join(out_dir, 'evaluation', chrom))    
-        save_predictions(output, regions, data_config.chrom_sizes, os.path.join(out_dir, 'evaluation', chrom))
+        # if mode == 'reproduce':
+        #     compare_predictions(out_dir, chrom, mode)
+
+def compare_predictions(out_dir, chrom):
+    import pandas as pd
+    df_tf = pd.read_csv(os.path.join(out_dir, 'reproduce', chrom, 'regions.csv'), sep='\t')
+    df_pt = pd.read_csv(os.path.join(out_dir, 'predict', chrom, 'regions.csv'), sep='\t')
+    df_tf_peaks = df_tf[df_tf['is_peak']==1]
+    df_pt_peaks = df_pt[df_pt['is_peak']==1]
+    
+    from chrombpnet.metrics import counts_metrics
+    # counts_metrics(df_tf['pred_count'], df_pt['pred_count'],outf=os.path.join(out_dir, 'reproduce', chrom, 'compare_counts.png'), title='',
+    #     fontsize=20, xlab='Log Count chrombpnet original', ylab='Log Count pytorch')
+    counts_metrics(df_tf_peaks['pred_count'], df_pt_peaks['pred_count'],outf=os.path.join(out_dir, 'reproduce', chrom, 'compare'), title='',
+        fontsize=20, xlab='Log Count chrombpnet original', ylab='Log Count pytorch')
 
 
 def interpret(args, model, datamodule=None):
@@ -236,6 +258,43 @@ def interpret(args, model, datamodule=None):
     # os.makedirs(os.path.join(out_dir, 'interpret'), exist_ok=True)
     # np.save(os.path.join(out_dir, 'interpret', 'mutagenesis.npy'), out)
 
+def reproduce(args):
+    out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}', 'reproduce')
+    os.makedirs(out_dir, exist_ok=True)
+    log = create_logger(args.model_type, ch=True, fh=os.path.join(out_dir, f'reproduce.log'), overwrite=True)
+    log.info(f'out_dir: {out_dir}')
+    log.info(f'model_type: {args.model_type}')
+    log.info(f'chrom: {args.chrom}')
+
+    if os.path.exists(os.path.join(args.out_dir, args.name, f'fold_{args.fold}', 'checkpoints/chrombpnet_wo_bias.pt')):
+        log.info(f'Model already trained, loading from {args.out_dir}/checkpoints/chrombpnet_wo_bias.pt')
+        args.chrombpnet_wo_bias = os.path.join(args.out_dir, args.name, f'fold_{args.fold}', 'checkpoints/chrombpnet_wo_bias.pt')
+    else:
+        train(args)
+
+    predict_path = os.path.join(args.out_dir, args.name, f'fold_{args.fold}', 'predict', args.chrom, 'regions.csv')
+    if not os.path.exists(predict_path):
+        log.info(f'Predicting with pytorch model')
+        model_wrapper = load_model(args)
+        predict(args, model_wrapper)
+    else:
+        log.info(f'{predict_path} already exists')
+        
+    if os.path.exists(os.path.join(args.data_dir, f'models/fold_{args.fold}/chrombpnet_wo_bias.h5')):
+        log.info(f'Predicting with chrombpnet model: {args.chrombpnet_wo_bias}')
+        args.checkpoint = os.path.join(args.data_dir, f'models/fold_{args.fold}/chrombpnet_wo_bias.h5')
+        reproduce_path = os.path.join(args.out_dir, args.name, f'fold_{args.fold}', 'reproduce', args.chrom, 'regions.csv')
+        if not os.path.exists(reproduce_path):
+            model_wrapper = load_model(args)
+            predict(args, model_wrapper, mode='reproduce')
+        else:
+            log.info(f'{reproduce_path} already exists')
+
+        compare_predictions(os.path.join(args.out_dir, args.name, f'fold_{args.fold}'), args.chrom)
+    else:
+        log.info(f'ChromBPNet model not found in {args.data_dir}/models/fold_{args.fold}/chrombpnet_wo_bias.h5')
+
+        
 
 def main():
     parser = get_parser()
@@ -243,19 +302,22 @@ def main():
 
     if args.command == 'train':
         train(args)
-        model = load_model(args)
-        predict(args, model)
+        model_wrapper = load_model(args)
+        predict(args, model_wrapper)
     elif args.command == 'predict':
-        model = load_model(args)
-        predict(args, model)
+        model_wrapper = load_model(args)
+        predict(args, model_wrapper)
     elif args.command == 'interpret':
-        model = load_model(args)
-        interpret(args, model)
+        model_wrapper = load_model(args)
+        interpret(args, model_wrapper)
     elif args.command == 'pipeline':
         train(args)
-        model = load_model(args)
-        predict(args, model)
-        interpret(args, model)
+        model_wrapper = load_model(args)
+        predict(args, model_wrapper)
+        interpret(args, model_wrapper)
+    elif args.command == 'reproduce':
+        reproduce(args)
+
     else:
         raise ValueError(f'Invalid command: {args.command}')
 

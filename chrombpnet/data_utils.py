@@ -199,7 +199,8 @@ def load_region_df(peak_bed, chrom_sizes=None, in_window=2114, shift=0, width=50
     if isinstance(chrom_sizes, str):
         chrom_sizes = read_chrom_sizes(chrom_sizes)
     else:
-        print(chrom_sizes)
+        # print(chrom_sizes)
+        pass
 
     if df.shape[1] < 10:
         df = expand_3col_to_10col(df)

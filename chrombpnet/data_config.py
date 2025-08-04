@@ -26,14 +26,10 @@ class DataConfig:
     def __init__(
             self,
             data_dir: str = None,
-            peaks: str = '{}/peaks.bed',
-            negatives: str = '{}/negatives.bed', 
-            bigwig: str = '{}/unstranded.bw', 
-            plus: str = '{}/plus.bw', #None
-            minus: str = '{}/minus.bw', #None
-            background: str = None,
-            ctl_plus: str = None, 
-            ctl_minus: str = None, 
+            peaks: str = None, #'{}/peaks.bed',
+            negatives: str = None, #'{}/negatives.bed', 
+            bigwig: str = None, #'{}/unstranded.bw', 
+            # background: str = None,
             negative_sampling_ratio: float = 0.1,
             saved_data: str = None,
             fasta: str = None,
@@ -61,14 +57,10 @@ class DataConfig:
             _genome = hg38 if genome == 'hg38' else mm10 if genome == 'mm10' else None
             _datasets = hg38_datasets() if genome == 'hg38' else mm10_datasets() if genome == 'mm10' else None
             self.data_dir = data_dir
-            self.peaks = peaks.format(data_dir) #if peaks is not None else f'{data_dir}/peaks.bed'
-            self.negatives = negatives.format(data_dir) #if negatives is not None else f'{data_dir}/negatives.bed'
-            self.bigwig = bigwig.format(data_dir) # f'{data_dir}/unstranded.bw'
-            self.plus = plus.format(data_dir) #if plus is not None else f'{data_dir}/plus.bw'
-            self.minus = minus.format(data_dir) #if minus is not None else f'{data_dir}/minus.bw'
-            self.background = background #if background is not None else f'{data_dir}/background.bw'
-            self.ctl_plus = ctl_plus #if ctl_plus is not None else f'{data_dir}/control.plus.bw'
-            self.ctl_minus = ctl_minus #if ctl_minus is not None else f'{data_dir}/control.minus.bw'
+            self.peaks = peaks if peaks is not None else f'{data_dir}/peaks.bed'
+            self.negatives = negatives if negatives is not None else f'{data_dir}/negatives.bed'
+            self.bigwig = bigwig if bigwig is not None else f'{data_dir}/unstranded.bw'
+            # self.background = background if background is not None else f'{data_dir}/background.bw'
             self.negative_sampling_ratio = negative_sampling_ratio
             self.saved_data = saved_data
             self.fasta = fasta if fasta is not None else _genome.fasta

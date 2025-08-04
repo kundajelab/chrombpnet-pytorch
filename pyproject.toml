@@ -40,6 +40,7 @@ dependencies = [
 
 [project.scripts]
 chrombpnet = "chrombpnet.main:main"
+snp_score = "chrombpnet.snp_scoring:main"
 
 [project.optional-dependencies]
 dev = [
