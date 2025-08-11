@@ -58,7 +58,7 @@ class DataConfig:
             _datasets = hg38_datasets() if genome == 'hg38' else mm10_datasets() if genome == 'mm10' else None
             self.data_dir = data_dir
             self.peaks = peaks if peaks is not None else f'{data_dir}/peaks.bed'
-            self.negatives = negatives if negatives is not None else f'{data_dir}/negatives.bed'
+            self.negatives = negatives if negatives is not None else f'{data_dir}/negatives.bed' if data_dir is not None else None 
             self.bigwig = bigwig if bigwig is not None else f'{data_dir}/unstranded.bw'
             # self.background = background if background is not None else f'{data_dir}/background.bw'
             self.negative_sampling_ratio = negative_sampling_ratio

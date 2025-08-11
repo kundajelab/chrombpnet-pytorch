@@ -37,28 +37,57 @@ def dna_to_one_hot(seqs):
     return one_hot_map[base_inds[:-4]].reshape((len(seqs), seq_len, 4))
 
 
+# def one_hot_to_dna(one_hot):
+#     """
+#     Converts a one-hot encoding into a list of DNA ("ACGT") sequences, where the
+#     position of 1s is ordered alphabetically by "ACGT". `one_hot` must be an
+#     N x L x 4 array of one-hot encodings. Returns a lits of N "ACGT" strings,
+#     each of length L, in the same order as the input array. The returned
+#     sequences will only consist of letters "A", "C", "G", "T", or "N" (all
+#     upper-case). Any encodings that are all 0s will be translated to "N".
+#     """
+#     bases = np.array(["A", "C", "G", "T", "N"])
+#     # Create N x L array of all 5s
+#     one_hot_inds = np.tile(one_hot.shape[2], one_hot.shape[:2])
+
+#     # Get indices of where the 1s are
+#     batch_inds, seq_inds, base_inds = np.where(one_hot)
+
+#     # In each of the locations in the N x L array, fill in the location of the 1
+#     one_hot_inds[batch_inds, seq_inds] = base_inds
+
+#     # Fetch the corresponding base for each position using indexing
+#     seq_array = bases[one_hot_inds]
+#     return ["".join(seq) for seq in seq_array]
+import numpy as np
+
 def one_hot_to_dna(one_hot):
     """
-    Converts a one-hot encoding into a list of DNA ("ACGT") sequences, where the
-    position of 1s is ordered alphabetically by "ACGT". `one_hot` must be an
-    N x L x 4 array of one-hot encodings. Returns a lits of N "ACGT" strings,
-    each of length L, in the same order as the input array. The returned
-    sequences will only consist of letters "A", "C", "G", "T", or "N" (all
-    upper-case). Any encodings that are all 0s will be translated to "N".
+    Converts one-hot encoded DNA (N, 4) or (N, L, 4) to sequences of ACGT/N.
+    Automatically handles dimensionality and avoids hardcoded constants.
     """
     bases = np.array(["A", "C", "G", "T", "N"])
-    # Create N x L array of all 5s
-    one_hot_inds = np.tile(one_hot.shape[2], one_hot.shape[:2])
+    n_bases = one_hot.shape[-1]
+    n_index = len(bases) - 1  # index for 'N'
 
-    # Get indices of where the 1s are
+    # Expand (N, 4) to (N, 1, 4)
+    if one_hot.ndim == 2 and one_hot.shape[1] == n_bases:
+        one_hot = one_hot[:, np.newaxis, :]
+
+    assert one_hot.ndim == 3 and one_hot.shape[2] == n_bases, "Expected shape (N, L, 4) or (N, 4)"
+
+    N, L = one_hot.shape[:2]
+
+    # Initialize with index for 'N'
+    one_hot_inds = np.full((N, L), n_index, dtype=int)
+
+    # Fill in valid base indices
     batch_inds, seq_inds, base_inds = np.where(one_hot)
-
-    # In each of the locations in the N x L array, fill in the location of the 1
     one_hot_inds[batch_inds, seq_inds] = base_inds
 
-    # Fetch the corresponding base for each position using indexing
-    seq_array = bases[one_hot_inds]
-    return ["".join(seq) for seq in seq_array]
+    # Convert to DNA strings
+    return ''.join(["".join(bases[idxs]) for idxs in one_hot_inds])
+
 
 
 # https://stackoverflow.com/questions/46091111/python-slice-array-at-different-position-on-every-row

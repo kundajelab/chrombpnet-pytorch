@@ -616,14 +616,13 @@ def create_model_wrapper(
         if args.bias_scaled:
             model_wrapper.model.bias = model_wrapper.init_bias(args.bias_scaled)
         if args.chrombpnet_wo_bias:
-            model_wrapper.model.model = model_wrapper.init_chrombpnet_wo_bias(args.chrombpnet_wo_bias)
+            model_wrapper.model.model = model_wrapper.init_chrombpnet_wo_bias(args.chrombpnet_wo_bias, freeze=False)
         return model_wrapper
     else:
         raise ValueError(f"Unknown model type: {model_type}") 
 
 
-def load_pretrained_model(args):
-    checkpoint = args.checkpoint
+def load_pretrained_model(checkpoint):
     if checkpoint is not None:
         if checkpoint.endswith('.ckpt'):
             model_wrapper = ChromBPNetWrapper.load_from_checkpoint(checkpoint)

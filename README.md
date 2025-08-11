@@ -73,6 +73,27 @@ chrombpnet interpret --data_dir <data_path> --checkpoint <model_cpkt/model_h5> -
 ```
 chrombpnet --data_dir <data_path> -o <output_path>
 ```
+
+### Finetune model
+```
+chrombpnet finetune --data_dir <data_path> --checkpoint <model>.h5/pt -o <output_path>
+```
+
+### Variant scoring
+```
+snp_score 
+ 	-l $snps \
+ 	-g $ref_fasta \
+ 	-pg $ref_fasta_peaks \
+ 	-s $chrom_sizes \
+ 	-ps $chrom_sizes_peaks \
+ 	-m $model \
+ 	-p $peaks \
+ 	-o $out_prefix \
+ 	-t 2 \
+ 	-li \
+ 	-sc chrombpnet
+```
 #### Input Format
 
 - `--bigwig` 

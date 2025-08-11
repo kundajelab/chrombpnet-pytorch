@@ -114,10 +114,17 @@ def get_parser() -> argparse.ArgumentParser:
 
     # Interpret sub-command
     interpret_parser = subparsers.add_parser('interpret', help='Interpret the ChromBPNet model.')
+
+    finetune_parser = subparsers.add_parser('finetune', help='Finetune the ChromBPNet model.')
+    add_common_args(finetune_parser)
+
     add_common_args(interpret_parser)
 
     reproduce_parser = subparsers.add_parser('reproduce', help='Reproduce the ChromBPNet model.')
     add_common_args(reproduce_parser)
+
+    predict_bias_parser = subparsers.add_parser('predict_bias', help='Predict bias with the ChromBPNet model.')
+    add_common_args(predict_bias_parser)
 
     add_common_args(parser)
 
@@ -125,6 +132,31 @@ def get_parser() -> argparse.ArgumentParser:
 
     return parser
 
+def load_model(args):
+    out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
+    if args.checkpoint is None:
+        checkpoint = os.path.join(out_dir, 'checkpoints/best_model.ckpt')
+        if not os.path.exists(checkpoint):
+            args.checkpoint = None
+            print(f'No checkpoint found in {out_dir}/checkpoints/best_model.ckpt')
+        else:
+            args.checkpoint = checkpoint
+            print(f'Loading checkpoint from {checkpoint}')
+    model = load_pretrained_model(args)
+    return model
+
+def compare_predictions(out_dir, chrom):
+    import pandas as pd
+    df_tf = pd.read_csv(os.path.join(out_dir, 'reproduce', chrom, 'regions.csv'), sep='\t')
+    df_pt = pd.read_csv(os.path.join(out_dir, 'predict', chrom, 'regions.csv'), sep='\t')
+    df_tf_peaks = df_tf[df_tf['is_peak']==1]
+    df_pt_peaks = df_pt[df_pt['is_peak']==1]
+    
+    from chrombpnet.metrics import counts_metrics
+    # counts_metrics(df_tf['pred_count'], df_pt['pred_count'],outf=os.path.join(out_dir, 'reproduce', chrom, 'compare_counts.png'), title='',
+    #     fontsize=20, xlab='Log Count chrombpnet original', ylab='Log Count pytorch')
+    counts_metrics(df_tf_peaks['pred_count'], df_pt_peaks['pred_count'],outf=os.path.join(out_dir, 'reproduce', chrom, 'compare'), title='',
+        fontsize=20, xlab='Log Count chrombpnet original', ylab='Log Count pytorch')
 
 def train(args):
     data_config = DataConfig.from_argparse_args(args)
@@ -182,18 +214,62 @@ def train(args):
     if args.model_type == 'chrombpnet' and not args.fast_dev_run:
         torch.save(model.model.model.state_dict(), os.path.join(out_dir, 'checkpoints/chrombpnet_wo_bias.pt'))
 
-def load_model(args):
-    out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
-    if args.checkpoint is None:
-        checkpoint = os.path.join(out_dir, 'checkpoints/best_model.ckpt')
-        if not os.path.exists(checkpoint):
-            args.checkpoint = None
-            print(f'No checkpoint found in {out_dir}/checkpoints/best_model.ckpt')
-        else:
-            args.checkpoint = checkpoint
-            print(f'Loading checkpoint from {checkpoint}')
-    model = load_pretrained_model(args)
-    return model
+def finetune(args):
+    data_config = DataConfig.from_argparse_args(args)
+    loggers=[L.pytorch.loggers.CSVLogger(args.out_dir, name=args.name, version=f'fold_{args.fold}')]
+    out_dir = os.path.join(args.out_dir, args.name, 'finetune', f'fold_{args.fold}')
+    os.makedirs(out_dir, exist_ok=True)
+
+    if os.path.exists(os.path.join(out_dir, 'checkpoints/best_model.ckpt')) and not args.force:
+        raise ValueError(f"Model folder {out_dir}/checkpoints/best_model.ckpt already exists. Please delete the existing model or specify a new version.")
+    if args.bias_scaled is None:
+        args.bias_scaled = os.path.join(args.data_dir, 'bias_scaled.h5')
+    log = create_logger(args.model_type, ch=True, fh=os.path.join(out_dir, 'train.log'), overwrite=True)
+    log.info(f'out_dir: {out_dir}')
+    log.info(f'bias: {args.bias_scaled}')      
+    log.info(f'adjust_bias: {args.adjust_bias}')
+    log.info(f'data_type: {data_config.data_type}')
+    log.info(f'in_window: {data_config.in_window}') 
+    log.info(f'data_dir: {data_config.data_dir}')
+    log.info(f'negative_sampling_ratio: {data_config.negative_sampling_ratio}')
+    log.info(f'fold: {args.fold}')
+    log.info(f'n_filters: {args.n_filters}')
+    log.info(f'batch_size: {data_config.batch_size}')
+    log.info(f'precision: {args.precision}')
+
+    datamodule = DataModule(data_config)
+
+    args.alpha = datamodule.median_count / 10
+    log.info(f'alpha: {args.alpha}')
+
+
+    # model = create_model_wrapper(args)
+    model = load_model(args)
+    if args.adjust_bias:
+        adjust_bias_model_logcounts(model.model.bias, datamodule.negative_dataloader())
+
+
+    trainer = L.Trainer(
+        max_epochs=args.max_epochs,
+        reload_dataloaders_every_n_epochs=1,
+        check_val_every_n_epoch=1, # 5
+        accelerator='gpu',
+        devices=args.gpu,
+        val_check_interval=None,
+        # strategy=DDPStrategy(find_unused_parameters=True),
+        callbacks=[
+            L.pytorch.callbacks.EarlyStopping(monitor='val_loss', patience=5),
+            L.pytorch.callbacks.ModelCheckpoint(monitor='val_loss', save_top_k=1, mode='min', filename='best_model', save_last=True),
+        ],
+        logger=loggers, # L.pytorch.loggers.TensorBoardLogger
+        fast_dev_run=args.fast_dev_run,
+        precision=args.precision,
+        gradient_clip_val=args.gradient_clip,
+        # precision="bf16"
+    )
+    trainer.fit(model, datamodule)
+    if args.model_type == 'chrombpnet' and not args.fast_dev_run:
+        torch.save(model.model.model.state_dict(), os.path.join(out_dir, 'checkpoints/chrombpnet_wo_bias.pt'))
 
 
 def predict(args, model, datamodule=None, mode='predict'):
@@ -220,25 +296,11 @@ def predict(args, model, datamodule=None, mode='predict'):
     # log.info(f"{chrom}: {regions['is_peak'].value_counts()}")
     output = trainer.predict(model, dataloader)
     regions, parsed_output = load_output_to_regions(output, dataset.regions, os.path.join(out_dir, mode, chrom))
+    if mode == 'predict_bias':
+        return
     # import pdb; pdb.set_trace()
     model_metrics = compare_with_observed(regions, parsed_output, os.path.join(out_dir, mode, chrom))     
     save_predictions(output, regions, data_config.chrom_sizes, os.path.join(out_dir, mode, chrom))
-
-        # if mode == 'reproduce':
-        #     compare_predictions(out_dir, chrom, mode)
-
-def compare_predictions(out_dir, chrom):
-    import pandas as pd
-    df_tf = pd.read_csv(os.path.join(out_dir, 'reproduce', chrom, 'regions.csv'), sep='\t')
-    df_pt = pd.read_csv(os.path.join(out_dir, 'predict', chrom, 'regions.csv'), sep='\t')
-    df_tf_peaks = df_tf[df_tf['is_peak']==1]
-    df_pt_peaks = df_pt[df_pt['is_peak']==1]
-    
-    from chrombpnet.metrics import counts_metrics
-    # counts_metrics(df_tf['pred_count'], df_pt['pred_count'],outf=os.path.join(out_dir, 'reproduce', chrom, 'compare_counts.png'), title='',
-    #     fontsize=20, xlab='Log Count chrombpnet original', ylab='Log Count pytorch')
-    counts_metrics(df_tf_peaks['pred_count'], df_pt_peaks['pred_count'],outf=os.path.join(out_dir, 'reproduce', chrom, 'compare'), title='',
-        fontsize=20, xlab='Log Count chrombpnet original', ylab='Log Count pytorch')
 
 
 def interpret(args, model, datamodule=None):
@@ -294,7 +356,8 @@ def reproduce(args):
     else:
         log.info(f'ChromBPNet model not found in {args.data_dir}/models/fold_{args.fold}/chrombpnet_wo_bias.h5')
 
-        
+
+
 
 def main():
     parser = get_parser()
@@ -310,6 +373,10 @@ def main():
     elif args.command == 'interpret':
         model_wrapper = load_model(args)
         interpret(args, model_wrapper)
+    elif args.command == 'finetune':
+        finetune(args)
+        model_wrapper = load_model(args)
+        predict(args, model_wrapper)
     elif args.command == 'pipeline':
         train(args)
         model_wrapper = load_model(args)
@@ -317,6 +384,14 @@ def main():
         interpret(args, model_wrapper)
     elif args.command == 'reproduce':
         reproduce(args)
+    elif args.command == 'predict_bias':
+        from chrombpnet.model_wrappers import BPNetWrapper
+        # model_wrapper = load_model(args)
+        bpnet_bias_wrapper = BPNetWrapper(args)
+        bpnet_bias_wrapper.model = bpnet_bias_wrapper.init_bias(args.bias_scaled)
+        print('bias_scaled', args.bias_scaled)
+        print('bpnet_bias_wrapper', bpnet_bias_wrapper.model)
+        predict(args, bpnet_bias_wrapper, mode='predict_bias')
 
     else:
         raise ValueError(f'Invalid command: {args.command}')
