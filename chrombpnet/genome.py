@@ -211,11 +211,21 @@ def hg19_datasets():
                 "hg19.gtf.gz": "md5:bd83e28270e595d3bde6bfcb21c9748f",
                 "hg19.chrom.sizes": "md5:b3b0fcf79b5477ab0b3af02e81eac8dc",
                 "hg19.fa": "md5:530d89d3ef07fdb2a9b3c701fb4ca486",
+                "fold_0.json": "md5:88bab8abe271c9ebb6655a0332b74998",
+                "fold_1.json": "md5:426f117b2d4e5885fb10ef7a3b7e593e",
+                "fold_2.json": "md5:b603378ebfcd8954aecd4ae60c4ce9b4",
+                "fold_3.json": "md5:8e70574ae38b7314c09cfc7db6194486",
+                "fold_4.json": "md5:eab6e147532e3cb5c8e6860b2e24da3b",
             },
             urls={
                 "hg19.fa": "https://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/hg19.fa.gz",
                 "hg19.gtf.gz": "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_19/gencode.v19.annotation.gtf.gz",
                 "hg19.chrom.sizes": "https://hgdownload.soe.ucsc.edu/goldenPath/hg19/bigZips/hg19.chrom.sizes",
+                "fold_0.json": "https://zenodo.org/records/12193595/files/fold_0.json",
+                "fold_1.json": "https://zenodo.org/records/12193595/files/fold_1.json",
+                "fold_2.json": "https://zenodo.org/records/12193595/files/fold_2.json",
+                "fold_3.json": "https://zenodo.org/records/12193595/files/fold_3.json",
+                "fold_4.json": "https://zenodo.org/records/12193595/files/fold_4.json",
             },
         )
     return EnhancedDataset(_create_dataset)

@@ -565,6 +565,8 @@ class BPNetWrapper(ModelWrapper):
         return y_profile.cpu().numpy(), y_count.cpu().numpy()
 
 
+
+
 class ChromBPNetWrapper(BPNetWrapper):
     """Wrapper for ChromBPNet model with specific configurations and loss functions.
     
