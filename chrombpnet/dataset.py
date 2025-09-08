@@ -366,7 +366,7 @@ def debug_subsample(peak_regions, chrom=None):
 
 
     peak_regions = peak_regions[peak_regions['chr'] == chrom]
-    print('debugging on ', chrom, 'shape', peak_regions.shape)
+    # print('debugging on ', chrom, 'shape', peak_regions.shape)
     return peak_regions.reset_index(drop=True)
 
 class ChromBPNetDataset(torch.utils.data.Dataset):

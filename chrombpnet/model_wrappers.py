@@ -15,6 +15,7 @@ import lightning as L
 from lightning import LightningModule
 from lightning.pytorch.utilities.types import STEP_OUTPUT
 import numpy as np
+from tqdm import tqdm
 import argparse
 
 from .chrombpnet import BPNet, ChromBPNet
@@ -93,6 +94,12 @@ def _to_numpy(tensor: torch.Tensor) -> np.ndarray:
     Returns:
         Numpy array
     """
+    if isinstance(tensor, torch.Tensor):
+        return tensor.detach().cpu().numpy()
+    elif isinstance(tensor, np.ndarray):
+        return tensor
+    else:
+        raise ValueError(f"Unsupported tensor type: {type(tensor)}")
     return tensor.detach().cpu().numpy()
 
 
@@ -108,22 +115,30 @@ def adjust_bias_model_logcounts(bias_model, dataloader, verbose=False, device=1)
     This would change if you change the model.
     """
 
-    print("Predicting within adjust counts")
+    print("Adjusting bias model counts")
     bias_model.eval()
+    delta = []
     with torch.no_grad():
-        output = L.Trainer(logger=False, devices=device).predict(bias_model, dataloader)
-        parsed_output = {key: np.concatenate([batch[key] for batch in output]) for key in output[0]}
-        try:    
-            delta = parsed_output['true_count'].mean(-1) - parsed_output['pred_count'].mean(-1)
-        except:
-            import pdb; pdb.set_trace()
-            # delta = parsed_output['true_count'].mean(dim=-1) - parsed_output['pred_count'].mean(dim=-1)
-        # delta = torch.cat([predictions['delta'] for predictions in predictions], dim=0)
-
+        bias_model.to('cuda')
+        for batch in tqdm(dataloader):
+            batch = {k: v.to('cuda') if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+            _, pred_counts = bias_model(batch['onehot_seq'])
+            true_counts = batch['profile'].sum(dim=-1).log1p()
+            # _delta = out['true_count'].mean(-1) - out['pred_count'].mean(-1)
+            _delta = true_counts.mean(-1) - pred_counts.mean(-1)
+            delta.append(_delta)
+        delta = torch.cat(delta, dim=0).mean()
+        # bpnet_wrapper = BPNetWrapper(args)
+        # bpnet_wrapper.model = bias_model
+        # output = L.Trainer(logger=False, devices=device).predict(bpnet_wrapper, dataloader)
+        # parsed_output = {key: np.concatenate([batch[key] for batch in output]) for key in output[0]}
+        # delta = parsed_output['true_count'].mean(-1) - parsed_output['pred_count'].mean(-1)
+        # delta = torch.cat([predictions['delta'] for predictions in predictions], dim=0).mean()
+        
         bias_model.linear.bias += torch.Tensor(delta).to(bias_model.linear.bias.device)
         
     if verbose:
-        print('### delta', delta.mean(), flush=True)
+        print('### delta', delta, flush=True)
     return bias_model
 
 def init_bias(bias, dataloader=None, verbose=False, device=1):

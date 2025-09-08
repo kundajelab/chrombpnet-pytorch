@@ -5,16 +5,13 @@ requires = ["hatchling"]
 [tool.hatch.build.targets.wheel]
 packages = ["chrombpnet"]
 
-[tool.hatch.metadata]
-license-files = ["LICENSE"]
-
 [project]
 name = "chrombpnet_pytorch"
 version = "0.0.4"
 description = "ChromBPNet pytorch"
 readme = "README.md"
 requires-python = ">=3.7"
-license = "MIT"
+license = { file = "LICENSE" }
 authors = [
     {name = "Lei Xiong", email = "jsxlei@gmail.com"}
 ]
