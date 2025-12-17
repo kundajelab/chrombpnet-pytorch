@@ -376,8 +376,8 @@ def main():
 
     if args.command == 'train':
         train(args)
-        # model_wrapper = load_model(args)
-        # predict(args, model_wrapper)
+        model_wrapper = load_model(args)
+        predict(args, model_wrapper)
     elif args.command == 'predict':
         model_wrapper = load_model(args)
         predict(args, model_wrapper)

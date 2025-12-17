@@ -67,8 +67,8 @@ class ChromBPNet(nn.Module):
         ):
         super().__init__()
 
-        # import lightning as L
-        # L.seed_everything(1234)
+        import lightning as L
+        L.seed_everything(1234)
 
         self.model = BPNet(        
             out_dim=config.out_dim,

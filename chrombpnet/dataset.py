@@ -170,7 +170,7 @@ class DataModule(L.LightningDataModule):
 
 
     def train_dataloader(self):
-        self.train_dataset.crop_revcomp_data()
+        # self.train_dataset.crop_revcomp_data()
         
         return torch.utils.data.DataLoader(
             self.train_dataset, 
