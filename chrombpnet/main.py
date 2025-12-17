@@ -170,6 +170,9 @@ def train(args):
     out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
     os.makedirs(out_dir, exist_ok=True)
 
+    ckpt_dir = os.path.join(out_dir, 'checkpoints')
+    os.makedirs(ckpt_dir, exist_ok=True)
+
     if os.path.exists(os.path.join(out_dir, 'checkpoints/best_model.ckpt')) and not args.force:
         raise ValueError(f"Model folder {out_dir}/checkpoints/best_model.ckpt already exists. Please delete the existing model or specify a new version.")
     if args.bias_scaled is None:
@@ -207,7 +210,14 @@ def train(args):
         # strategy=DDPStrategy(find_unused_parameters=True),
         callbacks=[
             L.pytorch.callbacks.EarlyStopping(monitor='val_loss', patience=5),
-            L.pytorch.callbacks.ModelCheckpoint(monitor='val_loss', save_top_k=1, mode='min', filename='best_model', save_last=True),
+            L.pytorch.callbacks.ModelCheckpoint(
+                dirpath=ckpt_dir,
+                monitor='val_loss',
+                save_top_k=1,
+                mode='min',
+                filename='best_model',
+                save_last=True
+            ),
         ],
         logger=loggers, # L.pytorch.loggers.TensorBoardLogger
         fast_dev_run=args.fast_dev_run,
@@ -217,8 +227,8 @@ def train(args):
     )
     trainer.fit(model, datamodule)
     if args.model_type == 'chrombpnet' and not args.fast_dev_run:
-        os.makedirs(os.path.join(out_dir, 'checkpoints'), exist_ok=True)
-        torch.save(model.model.model.state_dict(), os.path.join(out_dir, 'checkpoints/chrombpnet_wo_bias.pt'))
+        os.makedirs(os.path.join(out_dir, 'state_dict_checkpoints'), exist_ok=True)
+        torch.save(model.model.model.state_dict(), os.path.join(out_dir, 'state_dict_checkpoints/chrombpnet_wo_bias.pt'))
 
 def finetune(args):
     data_config = DataConfig.from_argparse_args(args)
