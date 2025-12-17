@@ -111,9 +111,6 @@ class DataModule(L.LightningDataModule):
         config = self.config
 
         if stage == 'fit':
-            # import lightning as L
-            # L.seed_everything(1234)
-
             train_peaks, train_nonpeaks = split_peak_and_nonpeak(self.train_data)
             val_peaks, val_nonpeaks = split_peak_and_nonpeak(self.val_data)
 
@@ -173,7 +170,7 @@ class DataModule(L.LightningDataModule):
 
 
     def train_dataloader(self):
-        # self.train_dataset.crop_revcomp_data()
+        self.train_dataset.crop_revcomp_data()
         
         return torch.utils.data.DataLoader(
             self.train_dataset, 

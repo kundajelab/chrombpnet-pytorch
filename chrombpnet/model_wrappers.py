@@ -103,7 +103,6 @@ def _to_numpy(tensor: torch.Tensor) -> np.ndarray:
     return tensor.detach().cpu().numpy()
 
 
-# TODO reset verbose to False
 def adjust_bias_model_logcounts(bias_model, dataloader, verbose=True, device=1):
     """
     Given a bias model, sequences and associated counts, the function adds a 
@@ -140,7 +139,7 @@ def adjust_bias_model_logcounts(bias_model, dataloader, verbose=True, device=1):
         
     if verbose:
         print('### delta', delta, flush=True)
-    return bias_model, delta
+    return bias_model
 
 def init_bias(bias, dataloader=None, verbose=False, device=1):
         print(f"Loading bias model from {bias}")

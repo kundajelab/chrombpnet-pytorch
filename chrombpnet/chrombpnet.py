@@ -67,9 +67,6 @@ class ChromBPNet(nn.Module):
         ):
         super().__init__()
 
-        import lightning as L
-        L.seed_everything(1234)
-
         self.model = BPNet(        
             out_dim=config.out_dim,
             n_filters=config.n_filters, 
@@ -89,18 +86,6 @@ class ChromBPNet(nn.Module):
         self._exp2 = _Exp()
 		
         self.n_control_tracks = config.n_control_tracks
-
-        # print("ChromBPNet configuration:")
-        # for key, value in vars(config).items():
-        #     print(f"  {key}: {value}")
-        # print("ChromBPNet model parameters:")
-        # for name, param in self.model.named_parameters():
-        #     print(f"  {name}: {param.data}")
-            # print(f"  {name} shape: {param.data.shape}")
-        # print("ChromBPNet bias model parameters:")
-        # for name, param in self.bias.named_parameters():
-        #     print(f"  {name}: {param.data}")
-        #     print(f"  {name} shape: {param.data.shape}")
 
         self.tf_style_reinit()
 
