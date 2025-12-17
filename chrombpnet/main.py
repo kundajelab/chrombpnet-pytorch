@@ -31,7 +31,49 @@ from lightning.pytorch.strategies import DDPStrategy
 # Set precision for matrix multiplication
 # torch.set_float32_matmul_precision('medium')
 
+# random instance id
+instance_id = str(np.random.randint(10000, 99999))
+
 # Set random seed for reproducibility
+def set_random_seed(seed: int, skip_tf: bool = False):
+    # set python & numpy
+    import random
+    random.seed(seed)
+    np.random.seed(seed)
+
+    if not skip_tf:
+        # set tensorflow
+        try:
+            import tensorflow as tf
+            tf.random.set_seed(seed)
+            os.environ["TF_DETERMINISTIC_OPS"] = "1"  # enforce deterministic GPU ops
+            os.environ["TF_CUDNN_DETERMINISTIC"] = "1"
+        except ImportError:
+            print("TensorFlow not installed, skipping tf seeding.")
+    else:
+        print("Skipping TensorFlow seeding as requested.")
+
+    # set torch
+    try:
+        import torch
+        from lightning.pytorch import seed_everything
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(seed)
+            torch.cuda.manual_seed_all(seed) # if using multi-GPU
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        seed_everything(seed)
+    except ImportError:
+        print("Torch not installed, skipping torch seeding.")
+
+    # ensure deterministic CUDA operations for Jax (see https://github.com/google/jax/issues/13672)
+    if "XLA_FLAGS" not in os.environ:
+        os.environ["XLA_FLAGS"] = "--xla_gpu_deterministic_ops=true"
+    else:
+        os.environ["XLA_FLAGS"] += " --xla_gpu_deterministic_ops=true"
+
+# set_random_seed(1234)
 L.seed_everything(1234)
 
 # Import local modules
@@ -160,7 +202,10 @@ def compare_predictions(out_dir, chrom):
 
 def train(args):
     data_config = DataConfig.from_argparse_args(args)
-    loggers=[L.pytorch.loggers.CSVLogger(args.out_dir, name=args.name, version=f'fold_{args.fold}')]
+    loggers=[
+        L.pytorch.loggers.WandbLogger(),
+        L.pytorch.loggers.CSVLogger(args.out_dir, name=args.name, version=f'fold_{args.fold}')
+    ]
     out_dir = os.path.join(args.out_dir, args.name, f'fold_{args.fold}')
     os.makedirs(out_dir, exist_ok=True)
 
@@ -186,11 +231,24 @@ def train(args):
     args.alpha = datamodule.median_count / 10
     log.info(f'alpha: {args.alpha}')
 
-
     model = create_model_wrapper(args)
-    if args.adjust_bias:
-        adjust_bias_model_logcounts(model.model.bias, datamodule.negative_dataloader())
 
+    # log.info("---- bias model parameters before adjustment ----")
+    # for name, param in model.model.bias.named_parameters():
+    #     log.info(f"{name}: {param.data}")
+
+    if args.adjust_bias:
+        _, delta = adjust_bias_model_logcounts(model.model.bias, datamodule.negative_dataloader())
+
+    # log.info("---- acc model parameters ----")
+    # for name, param in model.model.model.named_parameters():
+    #     log.info(f"{name}: {param.data}")
+
+    # log.info(f"delta bias adjustment: {delta}")
+
+    # log.info("---- bias model parameters ----")
+    # for name, param in model.model.bias.named_parameters():
+    #     log.info(f"{name}: {param.data}")
 
     trainer = L.Trainer(
         max_epochs=args.max_epochs,
@@ -212,6 +270,7 @@ def train(args):
     )
     trainer.fit(model, datamodule)
     if args.model_type == 'chrombpnet' and not args.fast_dev_run:
+        os.makedirs(os.path.join(out_dir, 'checkpoints'), exist_ok=False)
         torch.save(model.model.model.state_dict(), os.path.join(out_dir, 'checkpoints/chrombpnet_wo_bias.pt'))
 
 def finetune(args):
@@ -363,10 +422,15 @@ def main():
     parser = get_parser()
     args = parser.parse_args()
 
+    import wandb
+    run_config = vars(args)
+    run_config["run_pid"] = os.getpid()
+    wandb.init(project="histobpnet", name=args.name+"|"+instance_id, config=run_config)
+
     if args.command == 'train':
         train(args)
-        model_wrapper = load_model(args)
-        predict(args, model_wrapper)
+        # model_wrapper = load_model(args)
+        # predict(args, model_wrapper)
     elif args.command == 'predict':
         model_wrapper = load_model(args)
         predict(args, model_wrapper)

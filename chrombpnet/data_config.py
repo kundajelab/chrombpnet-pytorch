@@ -49,7 +49,8 @@ class DataConfig:
             fold: int = 0,
             genome: str = 'hg38',
             batch_size: int = 64,
-            num_workers: int = 32,
+            # num_workers: int = 32,
+            num_workers: int = 8,
             debug: bool = False,
             **kwargs,
         ):
@@ -63,6 +64,7 @@ class DataConfig:
             # self.background = background if background is not None else f'{data_dir}/background.bw'
             self.negative_sampling_ratio = negative_sampling_ratio
             self.saved_data = saved_data
+            print(f"fasta:", fasta, flush=True)
             self.fasta = fasta if fasta is not None else _genome.fasta
             self.chrom_sizes = chrom_sizes if chrom_sizes is not None else _genome.chrom_sizes
             self.in_window = in_window
