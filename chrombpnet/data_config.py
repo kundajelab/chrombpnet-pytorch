@@ -49,8 +49,7 @@ class DataConfig:
             fold: int = 0,
             genome: str = 'hg38',
             batch_size: int = 64,
-            # num_workers: int = 32,
-            num_workers: int = 8,
+            num_workers: int = 32,
             debug: bool = False,
             **kwargs,
         ):
